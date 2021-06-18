@@ -317,7 +317,6 @@ def train(args, net, train_loader, test_loader, boardio, textio, device):
     best_test_t_mae_ba = np.inf
 
     for epoch in range(args.epochs):
-        scheduler.step()
         train_loss, train_cycle_loss, \
         train_mse_ab, train_mae_ab, train_mse_ba, train_mae_ba, train_rotations_ab, train_translations_ab, \
         train_rotations_ab_pred, \
@@ -510,6 +509,7 @@ def train(args, net, train_loader, test_loader, boardio, textio, device):
         else:
             torch.save(net.state_dict(), 'checkpoints/%s/models/model.%d.t7' % (args.exp_name, epoch))
         gc.collect()
+        scheduler.step()
 
 
 def main():
