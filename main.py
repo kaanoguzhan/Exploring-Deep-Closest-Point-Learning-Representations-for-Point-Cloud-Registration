@@ -47,7 +47,7 @@ def _init_(args):
     os.system('cp data.py checkpoints' + '/' + args.exp_name + '/' + 'data.py.backup')
 
 
-def test_one_epoch(args, net, test_loader, device):
+def test_one_epoch(args, net, test_loader):
     net.eval()
     mse_ab = 0
     mae_ab = 0
@@ -71,12 +71,12 @@ def test_one_epoch(args, net, test_loader, device):
     eulers_ba = []
 
     for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba in tqdm(test_loader):
-        src = src.to(device)
-        target = target.to(device)
-        rotation_ab = rotation_ab.to(device)
-        translation_ab = translation_ab.to(device)
-        rotation_ba = rotation_ba.to(device)
-        translation_ba = translation_ba.to(device)
+        src = src.to(args.device)
+        target = target.to(args.device)
+        rotation_ab = rotation_ab.to(args.device)
+        translation_ab = translation_ab.to(args.device)
+        rotation_ba = rotation_ba.to(args.device)
+        translation_ba = translation_ba.to(args.device)
 
         batch_size = src.size(0)
         num_examples += batch_size
@@ -100,7 +100,7 @@ def test_one_epoch(args, net, test_loader, device):
         transformed_target = transform_point_cloud(target, rotation_ba_pred, translation_ba_pred)
 
         ###########################
-        identity = torch.eye(3).to(device).unsqueeze(0).repeat(batch_size, 1, 1)
+        identity = torch.eye(3).to(args.device).unsqueeze(0).repeat(batch_size, 1, 1)
         loss = F.mse_loss(torch.matmul(rotation_ab_pred.transpose(2, 1), rotation_ab), identity) \
                + F.mse_loss(translation_ab_pred, translation_ab)
         if args.cycle:
@@ -143,7 +143,7 @@ def test_one_epoch(args, net, test_loader, device):
            translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
 
 
-def train_one_epoch(args, net, train_loader, opt, device):
+def train_one_epoch(args, net, train_loader, opt):
     net.train()
 
     mse_ab = 0
@@ -168,12 +168,12 @@ def train_one_epoch(args, net, train_loader, opt, device):
     eulers_ba = []
 
     for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba in tqdm(train_loader):
-        src = src.to(device)
-        target = target.to(device)
-        rotation_ab = rotation_ab.to(device)
-        translation_ab = translation_ab.to(device)
-        rotation_ba = rotation_ba.to(device)
-        translation_ba = translation_ba.to(device)
+        src = src.to(args.device)
+        target = target.to(args.device)
+        rotation_ab = rotation_ab.to(args.device)
+        translation_ab = translation_ab.to(args.device)
+        rotation_ba = rotation_ba.to(args.device)
+        translation_ba = translation_ba.to(args.device)
 
         batch_size = src.size(0)
         opt.zero_grad()
@@ -197,7 +197,7 @@ def train_one_epoch(args, net, train_loader, opt, device):
 
         transformed_target = transform_point_cloud(target, rotation_ba_pred, translation_ba_pred)
         ###########################
-        identity = torch.eye(3).to(device).unsqueeze(0).repeat(batch_size, 1, 1)
+        identity = torch.eye(3).to(args.device).unsqueeze(0).repeat(batch_size, 1, 1)
         loss = F.mse_loss(torch.matmul(rotation_ab_pred.transpose(2, 1), rotation_ab), identity) \
                + F.mse_loss(translation_ab_pred, translation_ab)
         if args.cycle:
@@ -242,13 +242,13 @@ def train_one_epoch(args, net, train_loader, opt, device):
            translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
 
 
-def test(args, net, test_loader, boardio, textio, device):
+def test(args, net, test_loader, boardio, textio):
 
     test_loss, test_cycle_loss, \
     test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
     test_rotations_ab_pred, \
     test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
-    test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader, device)
+    test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader, args.device)
     test_rmse_ab = np.sqrt(test_mse_ab)
     test_rmse_ba = np.sqrt(test_mse_ba)
 
@@ -282,7 +282,7 @@ def test(args, net, test_loader, boardio, textio, device):
                      test_r_mae_ba, test_t_mse_ba, test_t_rmse_ba, test_t_mae_ba))
 
 
-def train(args, net, train_loader, test_loader, boardio, textio, device):
+def train(args, net, train_loader, test_loader, boardio, textio):
     if args.use_sgd:
         print("Use SGD")
         opt = optim.SGD(net.parameters(), lr=args.lr * 100, momentum=args.momentum, weight_decay=1e-4)
@@ -321,12 +321,12 @@ def train(args, net, train_loader, test_loader, boardio, textio, device):
         train_mse_ab, train_mae_ab, train_mse_ba, train_mae_ba, train_rotations_ab, train_translations_ab, \
         train_rotations_ab_pred, \
         train_translations_ab_pred, train_rotations_ba, train_translations_ba, train_rotations_ba_pred, \
-        train_translations_ba_pred, train_eulers_ab, train_eulers_ba = train_one_epoch(args, net, train_loader, opt, device)
+        train_translations_ba_pred, train_eulers_ab, train_eulers_ba = train_one_epoch(args, net, train_loader, opt)
         test_loss, test_cycle_loss, \
         test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
         test_rotations_ab_pred, \
         test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
-        test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader, device)
+        test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
         train_rmse_ab = np.sqrt(train_mse_ab)
         test_rmse_ab = np.sqrt(test_mse_ab)
 
@@ -570,6 +570,8 @@ def main():
                         help='Divided factor for rotations')
     parser.add_argument('--model_path', type=str, default='', metavar='N',
                         help='Pretrained model path')
+    parser.add_argument('--device', type=str, default='cuda', metavar='N',
+                        help='Pretrained model path')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
@@ -579,7 +581,14 @@ def main():
     np.random.seed(args.seed)
 
     boardio = SummaryWriter(log_dir='checkpoints/' + args.exp_name)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    # Read Device from run arguments and initilize the corresponding device
+    if 'cuda' in args.device and torch.cuda.is_available():
+        args.device = torch.device(args.device)
+    elif 'cpu' in args.device:
+        args.device = torch.device(args.device)
+    else:
+        raise NotImplementedError(f'Device:"{args.device}" is not implemented or not visible')
     _init_(args)
 
     textio = IOStream('checkpoints/' + args.exp_name + '/run.log')
@@ -599,7 +608,7 @@ def main():
         raise Exception("not implemented")
 
     if args.model == 'dcp':
-        net = DCP(args).to(device)
+        net = DCP(args).to(args.device)
         if args.eval:
             if args.model_path == '':
                 model_path = 'checkpoints' + '/' + args.exp_name + '/models/model.best.t7'
@@ -609,16 +618,16 @@ def main():
             if not os.path.exists(model_path):
                 print("can't find pretrained model")
                 return
-            net.load_state_dict(torch.load(model_path, map_location=torch.device(device)), strict=False)
+            net.load_state_dict(torch.load(model_path, map_location=torch.device(args.device)), strict=False)
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             net = nn.DataParallel(net)
             print("Let's use", torch.cuda.device_count(), "GPUs!")
     else:
         raise Exception('Not implemented')
     if args.eval:
-        test(args, net, test_loader, boardio, textio, device)
+        test(args, net, test_loader, boardio, textio)
     else:
-        train(args, net, train_loader, test_loader, boardio, textio, device)
+        train(args, net, train_loader, test_loader, boardio, textio)
 
 
     print('FINISH')
