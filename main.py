@@ -248,7 +248,7 @@ def test(args, net, test_loader, boardio, textio):
     test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
     test_rotations_ab_pred, \
     test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
-    test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader, args.device)
+    test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
     test_rmse_ab = np.sqrt(test_mse_ab)
     test_rmse_ba = np.sqrt(test_mse_ba)
 
