@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from util import quat2mat
 
-
+_EPS = 1e-5  # To prevent division by zero
 # Part of the code is referred from: http://nlp.seas.harvard.edu/2018/04/03/attention.html#positional-encoding
 
 def clones(module, N):
@@ -72,6 +72,168 @@ def get_graph_feature(x, k=20):
     feature = torch.cat((feature, x), dim=3).permute(0, 3, 1, 2)
 
     return feature
+
+
+def angle_difference(src, dst):
+    """Calculate angle between each pair of vectors.
+    Assumes points are l2-normalized to unit length.
+    Input:
+        src: source points, [B, N, C]
+        dst: target points, [B, M, C]
+    Output:
+        dist: per-point square distance, [B, N, M]
+    Based on: https://github.com/yewzijian/RPMNet
+    """
+    B, N, _ = src.shape
+    _, M, _ = dst.shape
+    dist = torch.matmul(src, dst.permute(0, 2, 1))
+    dist = torch.acos(dist)
+
+    return dist
+
+
+def square_distance(src, dst):
+    """Calculate Euclid distance between each two points.
+        src^T * dst = xn * xm + yn * ym + zn * zm；
+        sum(src^2, dim=-1) = xn*xn + yn*yn + zn*zn;
+        sum(dst^2, dim=-1) = xm*xm + ym*ym + zm*zm;
+        dist = (xn - xm)^2 + (yn - ym)^2 + (zn - zm)^2
+             = sum(src**2,dim=-1)+sum(dst**2,dim=-1)-2*src^T*dst
+    Args:
+        src: source points, [B, N, C]
+        dst: target points, [B, M, C]
+    Returns:
+        dist: per-point square distance, [B, N, M]
+    Based on: https://github.com/yewzijian/RPMNet
+    """
+    B, N, _ = src.shape
+    _, M, _ = dst.shape
+    dist = -2 * torch.matmul(src, dst.permute(0, 2, 1))
+    dist += torch.sum(src ** 2, dim=-1)[:, :, None]
+    dist += torch.sum(dst ** 2, dim=-1)[:, None, :]
+    return dist
+
+
+def match_features(feat_src, feat_ref, metric='l2'):
+    """ Compute pairwise distance between features
+    Args:
+        feat_src: (B, J, C)
+        feat_ref: (B, K, C)
+        metric: either 'angle' or 'l2' (squared euclidean)
+    Returns:
+        Matching matrix (B, J, K). i'th row describes how well the i'th point
+         in the src agrees with every point in the ref.
+    Based on: https://github.com/yewzijian/RPMNet
+    """
+    assert feat_src.shape[-1] == feat_ref.shape[-1]
+
+    if metric == 'l2':
+        dist_matrix = square_distance(feat_src, feat_ref)
+    elif metric == 'angle':
+        feat_src_norm = feat_src / (torch.norm(feat_src, dim=-1, keepdim=True) + _EPS)
+        feat_ref_norm = feat_ref / (torch.norm(feat_ref, dim=-1, keepdim=True) + _EPS)
+
+        dist_matrix = angle_difference(feat_src_norm, feat_ref_norm)
+    else:
+        raise NotImplementedError
+
+    return dist_matrix
+
+
+def sinkhorn(log_alpha, n_iters: int = 5, slack: bool = True, eps: float = -1) -> torch.Tensor:
+    """ Run sinkhorn iterations to generate a near doubly stochastic matrix, where each row or column sum to <=1
+    Args:
+        log_alpha: log of positive matrix to apply sinkhorn normalization (B, J, K)
+        n_iters (int): Number of normalization iterations
+        slack (bool): Whether to include slack row and column
+        eps: eps for early termination (Used only for handcrafted RPM). Set to negative to disable.
+    Returns:
+        log(perm_matrix): Doubly stochastic matrix (B, J, K)
+    Modified from original source taken from:
+        Learning Latent Permutations with Gumbel-Sinkhorn Networks
+        https://github.com/HeddaCohenIndelman/Learning-Gumbel-Sinkhorn-Permutations-w-Pytorch
+    Based on: https://github.com/yewzijian/RPMNet
+    """
+
+    # Sinkhorn iterations
+    prev_alpha = None
+    if slack:
+        zero_pad = nn.ZeroPad2d((0, 1, 0, 1))
+        log_alpha_padded = zero_pad(log_alpha[:, None, :, :])
+
+        log_alpha_padded = torch.squeeze(log_alpha_padded, dim=1)
+
+        for i in range(n_iters):
+            # Row normalization
+            log_alpha_padded = torch.cat((
+                    log_alpha_padded[:, :-1, :] - (torch.logsumexp(log_alpha_padded[:, :-1, :], dim=2, keepdim=True)),
+                    log_alpha_padded[:, -1, None, :]),  # Don't normalize last row
+                dim=1)
+
+            # Column normalization
+            log_alpha_padded = torch.cat((
+                    log_alpha_padded[:, :, :-1] - (torch.logsumexp(log_alpha_padded[:, :, :-1], dim=1, keepdim=True)),
+                    log_alpha_padded[:, :, -1, None]),  # Don't normalize last column
+                dim=2)
+
+            if eps > 0:
+                if prev_alpha is not None:
+                    abs_dev = torch.abs(torch.exp(log_alpha_padded[:, :-1, :-1]) - prev_alpha)
+                    if torch.max(torch.sum(abs_dev, dim=[1, 2])) < eps:
+                        break
+                prev_alpha = torch.exp(log_alpha_padded[:, :-1, :-1]).clone()
+
+        log_alpha = log_alpha_padded[:, :-1, :-1]
+    else:
+        for i in range(n_iters):
+            # Row normalization (i.e. each row sum to 1)
+            log_alpha = log_alpha - (torch.logsumexp(log_alpha, dim=2, keepdim=True))
+
+            # Column normalization (i.e. each column sum to 1)
+            log_alpha = log_alpha - (torch.logsumexp(log_alpha, dim=1, keepdim=True))
+
+            if eps > 0:
+                if prev_alpha is not None:
+                    abs_dev = torch.abs(torch.exp(log_alpha) - prev_alpha)
+                    if torch.max(torch.sum(abs_dev, dim=[1, 2])) < eps:
+                        break
+                prev_alpha = torch.exp(log_alpha).clone()
+
+    return log_alpha
+
+def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Tensor):
+    """Compute rigid transforms between two point sets
+    Args:
+        a (torch.Tensor): (B, M, 3) points
+        b (torch.Tensor): (B, N, 3) points
+        weights (torch.Tensor): (B, M)
+    Returns:
+        Transform T (B, 3, 4) to get from a to b, i.e. T*a = b
+    Based on: https://github.com/yewzijian/RPMNet
+    """
+
+    weights_normalized = weights[..., None] / (torch.sum(weights[..., None], dim=1, keepdim=True) + _EPS)
+    centroid_a = torch.sum(a * weights_normalized, dim=1)
+    centroid_b = torch.sum(b * weights_normalized, dim=1)
+    a_centered = a - centroid_a[:, None, :]
+    b_centered = b - centroid_b[:, None, :]
+    cov = a_centered.transpose(-2, -1) @ (b_centered * weights_normalized)
+
+    # Compute rotation using Kabsch algorithm. Will compute two copies with +/-V[:,:3]
+    # and choose based on determinant to avoid flips
+    u, s, v = torch.svd(cov, some=False, compute_uv=True)
+    rot_mat_pos = v @ u.transpose(-1, -2)
+    v_neg = v.clone()
+    v_neg[:, :, 2] *= -1
+    rot_mat_neg = v_neg @ u.transpose(-1, -2)
+    rot_mat = torch.where(torch.det(rot_mat_pos)[:, None, None] > 0, rot_mat_pos, rot_mat_neg)
+    assert torch.all(torch.det(rot_mat) > 0)
+
+    # Compute translation (uncenter centroid)
+    translation = -rot_mat @ centroid_a[:, :, None] + centroid_b[:, :, None]
+
+    transform = torch.cat((rot_mat, translation), dim=2)
+    return rot_mat, translation
 
 
 class EncoderDecoder(nn.Module):
@@ -251,6 +413,76 @@ class PositionwiseFeedForward(nn.Module):
         return self.w_2(self.norm(F.relu(self.w_1(x)).transpose(2, 1).contiguous()).transpose(2, 1).contiguous())
 
 
+class ParameterPredictionNet(nn.Module):
+    def __init__(self, weights_dim):
+        """PointNet based Parameter prediction network
+        Args:
+            weights_dim: Number of weights to predict (excluding beta), should be something like
+                         [3], or [64, 3], for 3 types of features
+         Based on: https://github.com/yewzijian/RPMNet
+        """
+
+        super().__init__()
+
+        self.weights_dim = weights_dim
+
+        # Pointnet
+        self.prepool = nn.Sequential(
+            nn.Conv1d(4, 64, 1),
+            nn.GroupNorm(8, 64),
+            nn.ReLU(),
+
+            nn.Conv1d(64, 64, 1),
+            nn.GroupNorm(8, 64),
+            nn.ReLU(),
+
+            nn.Conv1d(64, 64, 1),
+            nn.GroupNorm(8, 64),
+            nn.ReLU(),
+
+            nn.Conv1d(64, 128, 1),
+            nn.GroupNorm(8, 128),
+            nn.ReLU(),
+
+            nn.Conv1d(128, 1024, 1),
+            nn.GroupNorm(16, 1024),
+            nn.ReLU(),
+        )
+        self.pooling = nn.AdaptiveMaxPool1d(1)
+        self.postpool = nn.Sequential(
+            nn.Linear(1024, 512),
+            nn.GroupNorm(16, 512),
+            nn.ReLU(),
+
+            nn.Linear(512, 256),
+            nn.GroupNorm(16, 256),
+            nn.ReLU(),
+
+            nn.Linear(256, 2 + np.prod(weights_dim)),
+        )
+
+    def forward(self, x):
+        """ Returns alpha, beta, and gating_weights (if needed)
+        Args:
+            x: List containing two point clouds, x[0] = src (B, J, 3), x[1] = ref (B, K, 3)
+        Returns:
+            beta, alpha, weightings
+        """
+
+        src_padded = F.pad(x[0], (0, 1), mode='constant', value=0)
+        ref_padded = F.pad(x[1], (0, 1), mode='constant', value=1)
+        concatenated = torch.cat([src_padded, ref_padded], dim=1)
+
+        prepool_feat = self.prepool(concatenated.permute(0, 2, 1))
+        pooled = torch.flatten(self.pooling(prepool_feat), start_dim=-2)
+        raw_weights = self.postpool(pooled)
+
+        beta = F.softplus(raw_weights[:, 0])
+        alpha = F.softplus(raw_weights[:, 1])
+
+        return beta, alpha
+
+
 class PointNet(nn.Module):
     def __init__(self, emb_dims=512):
         super(PointNet, self).__init__()
@@ -378,18 +610,26 @@ class SVDHead(nn.Module):
         self.emb_dims = args.emb_dims
         self.reflect = nn.Parameter(torch.eye(3), requires_grad=False)
         self.reflect[2, 2] = -1
+        self.matching_method = args.matching_method
+        assert self.matching_method == 'softmax' or self.matching_method == 'sink_horn'
+        if self.matching_method == 'sink_horn':
+            self.weights_net = ParameterPredictionNet(weights_dim=[0])
 
-    def forward(self, *input):
-        src_embedding = input[0]
-        tgt_embedding = input[1]
-        src = input[2]
-        tgt = input[3]
+    def _calculate_svd_sink_horn(self, src, tgt, src_embedding, tgt_embedding):
+        beta, alpha = self.weights_net([src, tgt])
+        feat_distance = match_features(src_embedding, tgt_embedding)
+        affinity = self.compute_affinity(beta, feat_distance, alpha=alpha)
+        log_perm_matrix = sinkhorn(affinity, n_iters=self.num_sk_iter, slack=self.add_slack)
+        perm_matrix = torch.exp(log_perm_matrix)
+        weighted_tgt = perm_matrix @ tgt / (torch.sum(perm_matrix, dim=2, keepdim=True) + _EPS)
+        R, t = compute_rigid_transform(src, weighted_tgt, weights=torch.sum(perm_matrix, dim=2))
+        return R, t
+
+    def _calculate_svd_softmax(self, src, tgt, src_embedding, tgt_embedding):
         batch_size = src.size(0)
-
         d_k = src_embedding.size(1)
         scores = torch.matmul(src_embedding.transpose(2, 1).contiguous(), tgt_embedding) / math.sqrt(d_k)
         scores = torch.softmax(scores, dim=2)
-
         src_corr = torch.matmul(tgt, scores.transpose(2, 1).contiguous())
 
         src_centered = src - src.mean(dim=2, keepdim=True)
@@ -423,6 +663,19 @@ class SVDHead(nn.Module):
 
         t = torch.matmul(-R, src.mean(dim=2, keepdim=True)) + src_corr.mean(dim=2, keepdim=True)
         return R, t.view(batch_size, 3)
+
+    def forward(self, *input):
+        src_embedding = input[0]
+        tgt_embedding = input[1]
+        src = input[2]
+        tgt = input[3]
+
+        if self.matching_method == 'softmax':
+            return self._calculate_svd_softmax(src, tgt, src_embedding, tgt_embedding)
+        elif self.matching_method == 'sink_horn':
+            return self._calculate_svd_sink_horn(src, tgt, src_embedding, tgt_embedding)
+        else:
+            raise Exception('The matching method is invalid.')
 
 
 class DCP(nn.Module):
