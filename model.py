@@ -614,15 +614,30 @@ class SVDHead(nn.Module):
         assert self.matching_method == 'softmax' or self.matching_method == 'sink_horn'
         if self.matching_method == 'sink_horn':
             self.weights_net = ParameterPredictionNet(weights_dim=[0])
+            self.add_slack = not args.no_slack
+            self.num_sk_iter = args.num_sk_iter
+
+    def _compute_affinity(self, beta, feat_distance, alpha=0.5):
+        """Compute logarithm of Initial match matrix values, i.e. log(m_jk)"""
+        if isinstance(alpha, float):
+            hybrid_affinity = -beta[:, None, None] * (feat_distance - alpha)
+        else:
+            hybrid_affinity = -beta[:, None, None] * (feat_distance - alpha[:, None, None])
+        return hybrid_affinity
 
     def _calculate_svd_sink_horn(self, src, tgt, src_embedding, tgt_embedding):
+        src = src.permute(0, 2, 1)
+        src_embedding = src_embedding.permute(0, 2, 1)
+        tgt = tgt.permute(0, 2, 1)
+        tgt_embedding = tgt_embedding.permute(0, 2, 1)
         beta, alpha = self.weights_net([src, tgt])
         feat_distance = match_features(src_embedding, tgt_embedding)
-        affinity = self.compute_affinity(beta, feat_distance, alpha=alpha)
+        affinity = self._compute_affinity(beta, feat_distance, alpha=alpha)
         log_perm_matrix = sinkhorn(affinity, n_iters=self.num_sk_iter, slack=self.add_slack)
         perm_matrix = torch.exp(log_perm_matrix)
         weighted_tgt = perm_matrix @ tgt / (torch.sum(perm_matrix, dim=2, keepdim=True) + _EPS)
         R, t = compute_rigid_transform(src, weighted_tgt, weights=torch.sum(perm_matrix, dim=2))
+        t = t.squeeze(2)
         return R, t
 
     def _calculate_svd_softmax(self, src, tgt, src_embedding, tgt_embedding):

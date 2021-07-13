@@ -574,6 +574,9 @@ def main():
                         help='The point matching method')
     parser.add_argument('--device', type=str, default='cuda', metavar='N',
                         help='Pretrained model path')
+    parser.add_argument('--no_slack', action='store_true', help='If set, will not have a slack column.')
+    parser.add_argument('--num_sk_iter', type=int, default=5,
+                        help='Number of inner iterations used in sinkhorn normalization')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
