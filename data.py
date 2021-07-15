@@ -26,7 +26,7 @@ def download():
         os.system('rm %s' % (zipfile))
 
 
-def load_data(partition):
+def load_data_modelnet(partition):
     download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -41,7 +41,19 @@ def load_data(partition):
         all_label.append(label)
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
-    return all_data, all_label
+    return all_data, all_label, None
+
+
+def load_data_mixamo(partition):
+    pass
+
+
+def load_data(partition, dataset='modelnet40'):
+    assert dataset in ['modelnet40', 'mixamo']
+    if dataset == 'modelnet40':
+        return load_data_modelnet(partition)
+    else:
+        return load_data_mixamo(partition)
 
 
 def translate_pointcloud(pointcloud):
@@ -58,9 +70,9 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
     return pointcloud
 
 
-class ModelNet40(Dataset):
-    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4):
-        self.data, self.label = load_data(partition)
+class CustomDataset(Dataset):
+    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4, dataset='modelnet40'):
+        self.data, self.label, self.color = load_data(partition, dataset)
         self.num_points = num_points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
@@ -127,8 +139,8 @@ class ModelNet40(Dataset):
 
 
 if __name__ == '__main__':
-    train = ModelNet40(1024)
-    test = ModelNet40(1024, 'test')
+    train = CustomDataset(1024)
+    test = CustomDataset(1024, 'test')
     for data in train:
         print(len(data))
         break

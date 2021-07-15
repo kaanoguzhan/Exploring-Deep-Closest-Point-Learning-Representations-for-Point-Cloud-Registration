@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
-from data import ModelNet40
+from data import CustomDataset
 from model import DCP
 from util import transform_point_cloud, npmat2euler
 import numpy as np
@@ -577,6 +577,8 @@ def main():
     parser.add_argument('--no_slack', action='store_true', help='If set, will not have a slack column.')
     parser.add_argument('--num_sk_iter', type=int, default=5,
                         help='Number of inner iterations used in sinkhorn normalization')
+    parser.add_argument('--use_color', type=bool, default=False, metavar='N',
+                        help='Flag for using the color as input')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
@@ -600,14 +602,14 @@ def main():
     textio.cprint(str(args))
     textio.cprint(str(args))
 
-    if args.dataset == 'modelnet40':
+    if args.dataset in ['modelnet40', 'mixamo']:
         train_loader = DataLoader(
-            ModelNet40(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
-                       unseen=args.unseen, factor=args.factor),
+            CustomDataset(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset),
             batch_size=args.batch_size, shuffle=True, drop_last=True)
         test_loader = DataLoader(
-            ModelNet40(num_points=args.num_points, partition='test', gaussian_noise=args.gaussian_noise,
-                       unseen=args.unseen, factor=args.factor),
+            CustomDataset(num_points=args.num_points, partition='test', gaussian_noise=args.gaussian_noise,
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset),
             batch_size=args.test_batch_size, shuffle=False, drop_last=False)
     else:
         raise Exception("not implemented")
