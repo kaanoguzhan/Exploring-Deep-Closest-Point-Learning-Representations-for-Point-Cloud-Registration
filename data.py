@@ -81,7 +81,7 @@ class CustomDataset(Dataset):
         if dataset == 'modelnet40' and use_color:
             raise Exception('ModelNet40 does not support color. Please set use_color to false.')
         self.data, self.label, self.color = load_data(partition, dataset)
-        self.num_points = num_points  # TODO: Subsample points
+        self.num_points = num_points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
         self.unseen = unseen
@@ -103,7 +103,12 @@ class CustomDataset(Dataset):
                     self.color = self.color[self.label < 20]
 
     def __getitem__(self, item):
-        pointcloud = self.data[item][:self.num_points]
+        pointcloud = self.data[item]
+        permutation = np.random.permutation(len(pointcloud))
+        pointcloud = pointcloud[permutation[:self.num_points]]
+        if self.use_color:
+            color = self.color[item][permutation[:self.num_points]]
+
         if self.gaussian_noise:
             pointcloud = jitter_pointcloud(pointcloud)
         if self.partition != 'train':
@@ -148,7 +153,6 @@ class CustomDataset(Dataset):
         pointcloud2 = pointcloud2.T[permutation2].T
 
         if self.use_color:
-            color = self.color[item][:self.num_points]
             color1 = color[permutation1].T
             color2 = color[permutation2].T
         else:
