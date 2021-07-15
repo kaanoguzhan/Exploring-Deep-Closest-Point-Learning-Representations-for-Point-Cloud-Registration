@@ -700,6 +700,7 @@ class DCP(nn.Module):
         super(DCP, self).__init__()
         self.emb_dims = args.emb_dims
         self.cycle = args.cycle
+        self.use_color = args.use_color
         if args.emb_nn == 'pointnet':
             self.emb_nn = PointNet(emb_dims=self.emb_dims, use_color=args.use_color)
         elif args.emb_nn == 'dgcnn':
@@ -724,8 +725,18 @@ class DCP(nn.Module):
     def forward(self, *input):
         src = input[0]
         tgt = input[1]
-        src_embedding = self.emb_nn(src)
-        tgt_embedding = self.emb_nn(tgt)
+
+        if self.use_color:
+            src_color = input[2]
+            tgt_color = input[3]
+            embedding_input_src = torch.cat([src, src_color], dim=2)
+            embedding_input_tgt = torch.cat([tgt, tgt_color], dim=2)
+        else:
+            embedding_input_src = src
+            embedding_input_tgt = tgt
+
+        src_embedding = self.emb_nn(embedding_input_src)
+        tgt_embedding = self.emb_nn(embedding_input_tgt)
 
         src_embedding_p, tgt_embedding_p = self.pointer(src_embedding, tgt_embedding)
 

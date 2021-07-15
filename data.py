@@ -71,22 +71,31 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
 
 
 class CustomDataset(Dataset):
-    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4, dataset='modelnet40'):
+    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4,
+                 dataset='modelnet40', use_color=False):
+        if dataset == 'modelnet40' and use_color:
+            raise Exception('ModelNet40 does not support color. Please set use_color to false.')
         self.data, self.label, self.color = load_data(partition, dataset)
         self.num_points = num_points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
         self.unseen = unseen
-        self.label = self.label.squeeze()
+        if unseen:
+            self.label = self.label.squeeze()
         self.factor = factor
+        self.use_color = use_color
         if self.unseen:
             ######## simulate testing on first 20 categories while training on last 20 categories
             if self.partition == 'test':
-                self.data = self.data[self.label>=20]
-                self.label = self.label[self.label>=20]
+                self.data = self.data[self.label >= 20]
+                self.label = self.label[self.label >= 20]
+                if use_color:
+                    self.color = self.color[self.label >= 20]
             elif self.partition == 'train':
-                self.data = self.data[self.label<20]
-                self.label = self.label[self.label<20]
+                self.data = self.data[self.label < 20]
+                self.label = self.label[self.label < 20]
+                if use_color:
+                    self.color = self.color[self.label < 20]
 
     def __getitem__(self, item):
         pointcloud = self.data[item][:self.num_points]
@@ -127,12 +136,23 @@ class CustomDataset(Dataset):
         euler_ab = np.asarray([anglez, angley, anglex])
         euler_ba = -euler_ab[::-1]
 
-        pointcloud1 = np.random.permutation(pointcloud1.T).T
-        pointcloud2 = np.random.permutation(pointcloud2.T).T
+        permutation1 = np.random.permutation(len(pointcloud1.T))
+        pointcloud1 = pointcloud1.T[permutation1].T
+
+        permutation2 = np.random.permutation(len(pointcloud2.T))
+        pointcloud2 = pointcloud2.T[permutation2].T
+
+        if self.use_color:
+            color = self.color[item][:self.num_points]
+            color1 = color[permutation1]
+            color2 = color[permutation2]
+        else:
+            color1, color2 = np.empty(0), np.empty(0)
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
-               euler_ab.astype('float32'), euler_ba.astype('float32')
+               euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
+               color2.astype('float32')
 
     def __len__(self):
         return self.data.shape[0]
