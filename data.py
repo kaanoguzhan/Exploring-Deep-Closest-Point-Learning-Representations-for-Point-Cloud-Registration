@@ -45,7 +45,12 @@ def load_data_modelnet(partition):
 
 
 def load_data_mixamo(partition):
-    pass
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(BASE_DIR, 'data')
+    input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
+    data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
+    color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
+    return data, None, color
 
 
 def load_data(partition, dataset='modelnet40'):
@@ -76,7 +81,7 @@ class CustomDataset(Dataset):
         if dataset == 'modelnet40' and use_color:
             raise Exception('ModelNet40 does not support color. Please set use_color to false.')
         self.data, self.label, self.color = load_data(partition, dataset)
-        self.num_points = num_points
+        self.num_points = num_points  # TODO: Subsample points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
         self.unseen = unseen
@@ -144,8 +149,8 @@ class CustomDataset(Dataset):
 
         if self.use_color:
             color = self.color[item][:self.num_points]
-            color1 = color[permutation1]
-            color2 = color[permutation2]
+            color1 = color[permutation1].T
+            color2 = color[permutation2].T
         else:
             color1, color2 = np.empty(0), np.empty(0)
 

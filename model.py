@@ -729,8 +729,8 @@ class DCP(nn.Module):
         if self.use_color:
             src_color = input[2]
             tgt_color = input[3]
-            embedding_input_src = torch.cat([src, src_color], dim=2)
-            embedding_input_tgt = torch.cat([tgt, tgt_color], dim=2)
+            embedding_input_src = torch.cat([src, src_color], dim=1)
+            embedding_input_tgt = torch.cat([tgt, tgt_color], dim=1)
         else:
             embedding_input_src = src
             embedding_input_tgt = tgt
