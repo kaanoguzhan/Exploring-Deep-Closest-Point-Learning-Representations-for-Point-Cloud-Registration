@@ -46,7 +46,7 @@ def load_data_modelnet(partition):
     return all_data, all_label, None
 
 
-def load_data_mixamo(partition,num_points):
+def load_data_mixamo(partition, num_points, different_sampling):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data/objfiles')
     #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
@@ -61,9 +61,14 @@ def load_data_mixamo(partition,num_points):
     for file in npy_files:
         tmp = np.load(file)
         rng = np.arange(len(tmp[:,0]))
-        np.random.shuffle(rng)
-        data.append(tmp[rng[:num_points],0])
-        color.append(tmp[rng[:num_points],1])
+        if not different_sampling:
+            np.random.shuffle(rng)
+            data.append(tmp[rng[:num_points], 0])
+            color.append(tmp[rng[:num_points], 1])
+        else:
+            # Return all points
+            data.append(tmp[:, 0])
+            color.append(tmp[:, 1])
         
     data = np.array(data)
     color = np.array(color)
@@ -76,12 +81,12 @@ def load_data_mixamo(partition,num_points):
     return data, None, color
 
 
-def load_data(partition, dataset='modelnet40', num_points=1024):
+def load_data(partition, different_sampling, dataset='modelnet40', num_points=1024):
     assert dataset in ['modelnet40', 'mixamo']
     if dataset == 'modelnet40':
         return load_data_modelnet(partition)
     else:
-        return load_data_mixamo(partition,num_points)
+        return load_data_mixamo(partition, num_points, different_sampling)
 
 
 def translate_pointcloud(pointcloud):
@@ -100,11 +105,13 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
 
 class CustomDataset(Dataset):
     def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4,
-                 dataset='modelnet40', use_color=False):
+                 dataset='modelnet40', use_color=False, different_sampling=False):
         
         if dataset == 'modelnet40' and use_color:
             raise Exception('ModelNet40 does not support color. Please set use_color to false.')
-        self.data, self.label, self.color = load_data(partition, dataset, num_points)
+        self.different_sampling = different_sampling
+        self.data, self.label, self.color = load_data(partition=partition, different_sampling=different_sampling,
+                                                      dataset=dataset, num_points=num_points)
         self.num_points = num_points  # TODO: Subsample points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
@@ -128,10 +135,8 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, item):
         pointcloud = self.data[item]
-        permutation = np.random.permutation(len(pointcloud))
-        pointcloud = pointcloud[permutation[:self.num_points]]
         if self.use_color:
-            color = self.color[item][permutation[:self.num_points]]
+            color = self.color[item]
 
         if self.gaussian_noise:
             pointcloud = jitter_pointcloud(pointcloud)
@@ -171,19 +176,21 @@ class CustomDataset(Dataset):
         euler_ab = np.asarray([anglez, angley, anglex])
         euler_ba = -euler_ab[::-1]
 
-        permutation1 = np.random.permutation(len(pointcloud1.T))
-        pointcloud1 = pointcloud1.T[permutation1].T
+        permutation1 = np.random.permutation(len(pointcloud1.T))[:self.num_points]
+        if self.different_sampling:
+            permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
+        else:
+            permutation2 = permutation1
 
-        permutation2 = np.random.permutation(len(pointcloud2.T))
-        pointcloud2 = pointcloud2.T[permutation2].T
+        pointcloud1 = pointcloud1[:, permutation1]
+        pointcloud2 = pointcloud2[:, permutation2]
 
         if self.use_color:
             color1 = color[permutation1].T
             color2 = color[permutation2].T
         else:
             color1, color2 = np.empty(0), np.empty(0)
-        
-        
+
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
                euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
