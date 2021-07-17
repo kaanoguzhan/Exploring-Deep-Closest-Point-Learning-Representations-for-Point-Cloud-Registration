@@ -514,12 +514,12 @@ def train(args, net, train_loader, test_loader, boardio, textio):
 
 def main():
     parser = argparse.ArgumentParser(description='Point Cloud Registration')
-    parser.add_argument('--exp_name', type=str, default='exp', metavar='N',
+    parser.add_argument('--exp-name', type=str, default='exp', metavar='N',
                         help='Name of the experiment')
     parser.add_argument('--model', type=str, default='dcp', metavar='N',
                         choices=['dcp'],
                         help='Model to use, [dcp]')
-    parser.add_argument('--emb_nn', type=str, default='pointnet', metavar='N',
+    parser.add_argument('--emb-nn', type=str, default='pointnet', metavar='N',
                         choices=['pointnet', 'dgcnn'],
                         help='Embedding nn to use, [pointnet, dgcnn]')
     parser.add_argument('--pointer', type=str, default='transformer', metavar='N',
@@ -538,19 +538,19 @@ def main():
                         help='Num of dimensions of fc in transformer')
     parser.add_argument('--dropout', type=float, default=0.0, metavar='N',
                         help='Dropout ratio in transformer')
-    parser.add_argument('--batch_size', type=int, default=32, metavar='batch_size',
+    parser.add_argument('--batch-size', type=int, default=32, metavar='batch_size',
                         help='Size of batch)')
-    parser.add_argument('--test_batch_size', type=int, default=10, metavar='batch_size',
+    parser.add_argument('--test-batch_size', type=int, default=10, metavar='batch_size',
                         help='Size of batch)')
     parser.add_argument('--epochs', type=int, default=250, metavar='N',
                         help='number of episode to train ')
-    parser.add_argument('--use_sgd', action='store_true', default=False,
+    parser.add_argument('--use-sgd', action='store_true', default=False,
                         help='Use SGD')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.001, 0.1 if using sgd)')
     parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                         help='SGD momentum (default: 0.9)')
-    parser.add_argument('--no_cuda', action='store_true', default=False,
+    parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='enables CUDA training')
     parser.add_argument('--seed', type=int, default=1234, metavar='S',
                         help='random seed (default: 1)')
@@ -558,25 +558,27 @@ def main():
                         help='evaluate the model')
     parser.add_argument('--cycle', type=bool, default=False, metavar='N',
                         help='Whether to use cycle consistency')
-    parser.add_argument('--gaussian_noise', type=bool, default=False, metavar='N',
+    parser.add_argument('--gaussian-noise', type=bool, default=False, metavar='N',
                         help='Wheter to add gaussian noise')
     parser.add_argument('--unseen', type=bool, default=False, metavar='N',
                         help='Wheter to test on unseen category')
-    parser.add_argument('--num_points', type=int, default=1024, metavar='N',
+    parser.add_argument('--num-points', type=int, default=1024, metavar='N',
                         help='Num of points to use')
     parser.add_argument('--dataset', type=str, default='modelnet40', choices=['modelnet40'], metavar='N',
                         help='dataset to use')
     parser.add_argument('--factor', type=float, default=4, metavar='N',
                         help='Divided factor for rotations')
-    parser.add_argument('--model_path', type=str, default='', metavar='N',
+    parser.add_argument('--model-path', type=str, default='', metavar='N',
                         help='Pretrained model path')
-    parser.add_argument('--matching_method', type=str, default='softmax', metavar='N', choices=['softmax', 'sink_horn'],
+    parser.add_argument('--matching-method', type=str, default='softmax', metavar='N', choices=['softmax', 'sink_horn'],
                         help='The point matching method')
     parser.add_argument('--device', type=str, default='cuda', metavar='N',
                         help='Pretrained model path')
     parser.add_argument('--no_slack', action='store_true', help='If set, will not have a slack column.')
     parser.add_argument('--num_sk_iter', type=int, default=5,
                         help='Number of inner iterations used in sinkhorn normalization')
+    parser.add_argument('--use-color', type=bool, default=False, metavar='N',
+                        help='Flag for using the color as input')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
