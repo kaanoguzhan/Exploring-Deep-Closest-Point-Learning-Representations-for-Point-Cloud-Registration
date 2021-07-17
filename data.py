@@ -9,6 +9,7 @@ import h5py
 import numpy as np
 from scipy.spatial.transform import Rotation
 from torch.utils.data import Dataset
+import trimesh
 
 
 # Part of the code is referred from: https://github.com/charlesq34/pointnet
@@ -41,24 +42,46 @@ def load_data_modelnet(partition):
         all_label.append(label)
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
+    
     return all_data, all_label, None
 
 
-def load_data_mixamo(partition):
+def load_data_mixamo(partition,num_points):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(BASE_DIR, 'data')
-    input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
-    data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
-    color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
+    DATA_DIR = os.path.join(BASE_DIR, 'data/objfiles')
+    #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
+    #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
+    #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
+    data , color = [], []
+    
+    # [(x,3),(x,3)] 
+    
+    npy_files = glob.glob(DATA_DIR + "/*.npy")
+    
+    for file in npy_files:
+        tmp = np.load(file)
+        rng = np.arange(len(tmp[:,0]))
+        np.random.shuffle(rng)
+        data.append(tmp[rng[:num_points],0])
+        color.append(tmp[rng[:num_points],1])
+        
+    data = np.array(data)
+    color = np.array(color)
+
+    #print(data.shape)
+    #print(color.shape)
+    #data = np.concatenate(data,axis=0)
+    #color = np.concatenate(color,axis=0)
+    
     return data, None, color
 
 
-def load_data(partition, dataset='modelnet40'):
+def load_data(partition, dataset='modelnet40', num_points=1024):
     assert dataset in ['modelnet40', 'mixamo']
     if dataset == 'modelnet40':
         return load_data_modelnet(partition)
     else:
-        return load_data_mixamo(partition)
+        return load_data_mixamo(partition,num_points)
 
 
 def translate_pointcloud(pointcloud):
@@ -78,10 +101,11 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
 class CustomDataset(Dataset):
     def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4,
                  dataset='modelnet40', use_color=False):
+        
         if dataset == 'modelnet40' and use_color:
             raise Exception('ModelNet40 does not support color. Please set use_color to false.')
-        self.data, self.label, self.color = load_data(partition, dataset)
-        self.num_points = num_points
+        self.data, self.label, self.color = load_data(partition, dataset, num_points)
+        self.num_points = num_points  # TODO: Subsample points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
         self.unseen = unseen
@@ -142,6 +166,7 @@ class CustomDataset(Dataset):
 
         rotation_ab = Rotation.from_euler('zyx', [anglez, angley, anglex])
         pointcloud2 = rotation_ab.apply(pointcloud1.T).T + np.expand_dims(translation_ab, axis=1)
+        
 
         euler_ab = np.asarray([anglez, angley, anglex])
         euler_ba = -euler_ab[::-1]
@@ -157,7 +182,8 @@ class CustomDataset(Dataset):
             color2 = color[permutation2].T
         else:
             color1, color2 = np.empty(0), np.empty(0)
-
+        
+        
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
                euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
