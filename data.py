@@ -191,10 +191,7 @@ class CustomDataset(Dataset):
         euler_ba = -euler_ab[::-1]
 
         permutation1 = np.random.permutation(len(pointcloud1.T))[:self.num_points]
-        if self.different_sampling:
-            permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
-        else:
-            permutation2 = permutation1
+        permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
 
         pointcloud1 = pointcloud1[:, permutation1]
         pointcloud2 = pointcloud2[:, permutation2]
