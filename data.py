@@ -55,8 +55,14 @@ def load_data_mixamo(partition, num_points, different_sampling):
     data , color = [], []
     
     # [(x,3),(x,3)] 
-    
-    npy_files = glob.glob(DATA_DIR + "/*.npy")
+    if partition == "train":
+        npy_files = glob.glob(DATA_DIR + "/*.npy")
+    elif partition == "test":
+        test_size = 5
+        npy_files = glob.glob(DATA_DIR + "/*.npy")
+        npy_files = np.array(npy_files)
+        rng_test = np.arange(len(npy_files))
+        npy_files = npy_files[rng_test[:test_size]]
     
     for file in npy_files:
         tmp = np.load(file)
