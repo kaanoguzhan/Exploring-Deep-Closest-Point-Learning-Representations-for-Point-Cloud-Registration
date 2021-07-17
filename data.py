@@ -49,7 +49,6 @@ def load_data_modelnet(partition):
 def load_data_mixamo(partition, num_points, different_sampling):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'mixamo', 'objfiles'])
-    print(f'BASE:{DATA_DIR}')
     #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
     #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
     #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
