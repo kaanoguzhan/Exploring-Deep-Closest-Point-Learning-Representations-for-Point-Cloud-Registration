@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
-from data import ModelNet40
+from data import CustomDataset
 from model import DCP
 from util import transform_point_cloud, npmat2euler
 import numpy as np
@@ -70,9 +70,13 @@ def test_one_epoch(args, net, test_loader):
     eulers_ab = []
     eulers_ba = []
 
-    for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba in tqdm(test_loader):
+    for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba, \
+            color_src, color_target in tqdm(test_loader):
         src = src.to(args.device)
         target = target.to(args.device)
+        color_src = color_src.to(args.device)
+        color_target = color_target.to(args.device)
+
         rotation_ab = rotation_ab.to(args.device)
         translation_ab = translation_ab.to(args.device)
         rotation_ba = rotation_ba.to(args.device)
@@ -80,7 +84,8 @@ def test_one_epoch(args, net, test_loader):
 
         batch_size = src.size(0)
         num_examples += batch_size
-        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = net(src, target)
+        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
+            net(src, target, color_src, color_target)
 
         ## save rotation and translation
         rotations_ab.append(rotation_ab.detach().cpu().numpy())
@@ -167,9 +172,12 @@ def train_one_epoch(args, net, train_loader, opt):
     eulers_ab = []
     eulers_ba = []
 
-    for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba in tqdm(train_loader):
+    for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba, \
+            color_src, color_target in tqdm(train_loader):
         src = src.to(args.device)
         target = target.to(args.device)
+        color_src = color_src.to(args.device)
+        color_target = color_target.to(args.device)
         rotation_ab = rotation_ab.to(args.device)
         translation_ab = translation_ab.to(args.device)
         rotation_ba = rotation_ba.to(args.device)
@@ -178,7 +186,8 @@ def train_one_epoch(args, net, train_loader, opt):
         batch_size = src.size(0)
         opt.zero_grad()
         num_examples += batch_size
-        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = net(src, target)
+        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
+            net(src, target, color_src, color_target)
 
         ## save rotation and translation
         rotations_ab.append(rotation_ab.detach().cpu().numpy())
@@ -564,7 +573,7 @@ def main():
                         help='Wheter to test on unseen category')
     parser.add_argument('--num-points', type=int, default=1024, metavar='N',
                         help='Num of points to use')
-    parser.add_argument('--dataset', type=str, default='modelnet40', choices=['modelnet40'], metavar='N',
+    parser.add_argument('--dataset', type=str, default='modelnet40', choices=['modelnet40', 'mixamo'], metavar='N',
                         help='dataset to use')
     parser.add_argument('--factor', type=float, default=4, metavar='N',
                         help='Divided factor for rotations')
@@ -602,14 +611,14 @@ def main():
     textio.cprint(str(args))
     textio.cprint(str(args))
 
-    if args.dataset == 'modelnet40':
+    if args.dataset in ['modelnet40', 'mixamo']:
         train_loader = DataLoader(
-            ModelNet40(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
-                       unseen=args.unseen, factor=args.factor),
+            CustomDataset(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color),
             batch_size=args.batch_size, shuffle=True, drop_last=True)
         test_loader = DataLoader(
-            ModelNet40(num_points=args.num_points, partition='test', gaussian_noise=args.gaussian_noise,
-                       unseen=args.unseen, factor=args.factor),
+            CustomDataset(num_points=args.num_points, partition='test', gaussian_noise=args.gaussian_noise,
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color),
             batch_size=args.test_batch_size, shuffle=False, drop_last=False)
     else:
         raise Exception("not implemented")

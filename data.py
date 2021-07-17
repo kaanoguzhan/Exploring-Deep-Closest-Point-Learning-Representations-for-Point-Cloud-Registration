@@ -26,7 +26,7 @@ def download():
         os.system('rm %s' % (zipfile))
 
 
-def load_data(partition):
+def load_data_modelnet(partition):
     download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -41,7 +41,24 @@ def load_data(partition):
         all_label.append(label)
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
-    return all_data, all_label
+    return all_data, all_label, None
+
+
+def load_data_mixamo(partition):
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(BASE_DIR, 'data')
+    input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
+    data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
+    color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
+    return data, None, color
+
+
+def load_data(partition, dataset='modelnet40'):
+    assert dataset in ['modelnet40', 'mixamo']
+    if dataset == 'modelnet40':
+        return load_data_modelnet(partition)
+    else:
+        return load_data_mixamo(partition)
 
 
 def translate_pointcloud(pointcloud):
@@ -58,26 +75,40 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
     return pointcloud
 
 
-class ModelNet40(Dataset):
-    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4):
-        self.data, self.label = load_data(partition)
+class CustomDataset(Dataset):
+    def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4,
+                 dataset='modelnet40', use_color=False):
+        if dataset == 'modelnet40' and use_color:
+            raise Exception('ModelNet40 does not support color. Please set use_color to false.')
+        self.data, self.label, self.color = load_data(partition, dataset)
         self.num_points = num_points
         self.partition = partition
         self.gaussian_noise = gaussian_noise
         self.unseen = unseen
-        self.label = self.label.squeeze()
+        if unseen:
+            self.label = self.label.squeeze()
         self.factor = factor
+        self.use_color = use_color
         if self.unseen:
             ######## simulate testing on first 20 categories while training on last 20 categories
             if self.partition == 'test':
-                self.data = self.data[self.label>=20]
-                self.label = self.label[self.label>=20]
+                self.data = self.data[self.label >= 20]
+                self.label = self.label[self.label >= 20]
+                if use_color:
+                    self.color = self.color[self.label >= 20]
             elif self.partition == 'train':
-                self.data = self.data[self.label<20]
-                self.label = self.label[self.label<20]
+                self.data = self.data[self.label < 20]
+                self.label = self.label[self.label < 20]
+                if use_color:
+                    self.color = self.color[self.label < 20]
 
     def __getitem__(self, item):
-        pointcloud = self.data[item][:self.num_points]
+        pointcloud = self.data[item]
+        permutation = np.random.permutation(len(pointcloud))
+        pointcloud = pointcloud[permutation[:self.num_points]]
+        if self.use_color:
+            color = self.color[item][permutation[:self.num_points]]
+
         if self.gaussian_noise:
             pointcloud = jitter_pointcloud(pointcloud)
         if self.partition != 'train':
@@ -115,20 +146,30 @@ class ModelNet40(Dataset):
         euler_ab = np.asarray([anglez, angley, anglex])
         euler_ba = -euler_ab[::-1]
 
-        pointcloud1 = np.random.permutation(pointcloud1.T).T
-        pointcloud2 = np.random.permutation(pointcloud2.T).T
+        permutation1 = np.random.permutation(len(pointcloud1.T))
+        pointcloud1 = pointcloud1.T[permutation1].T
+
+        permutation2 = np.random.permutation(len(pointcloud2.T))
+        pointcloud2 = pointcloud2.T[permutation2].T
+
+        if self.use_color:
+            color1 = color[permutation1].T
+            color2 = color[permutation2].T
+        else:
+            color1, color2 = np.empty(0), np.empty(0)
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
-               euler_ab.astype('float32'), euler_ba.astype('float32')
+               euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
+               color2.astype('float32')
 
     def __len__(self):
         return self.data.shape[0]
 
 
 if __name__ == '__main__':
-    train = ModelNet40(1024)
-    test = ModelNet40(1024, 'test')
+    train = CustomDataset(1024)
+    test = CustomDataset(1024, 'test')
     for data in train:
         print(len(data))
         break
