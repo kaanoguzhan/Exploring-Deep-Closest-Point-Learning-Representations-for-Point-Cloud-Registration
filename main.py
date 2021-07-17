@@ -605,6 +605,8 @@ def main():
                         help='Flag for using the color as input')
     parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
                         help='Flag for using different sampling in source and target')
+    parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
+                        help='Flag for using different sampling in source and target')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
