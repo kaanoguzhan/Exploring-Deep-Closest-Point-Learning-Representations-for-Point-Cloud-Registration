@@ -18,6 +18,7 @@ from util import quat2mat
 _EPS = 1e-5  # To prevent division by zero
 # Part of the code is referred from: http://nlp.seas.harvard.edu/2018/04/03/attention.html#positional-encoding
 
+
 def clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
@@ -166,14 +167,14 @@ def sinkhorn(log_alpha, n_iters: int = 5, slack: bool = True, eps: float = -1) -
         for i in range(n_iters):
             # Row normalization
             log_alpha_padded = torch.cat((
-                    log_alpha_padded[:, :-1, :] - (torch.logsumexp(log_alpha_padded[:, :-1, :], dim=2, keepdim=True)),
-                    log_alpha_padded[:, -1, None, :]),  # Don't normalize last row
+                log_alpha_padded[:, :-1, :] - (torch.logsumexp(log_alpha_padded[:, :-1, :], dim=2, keepdim=True)),
+                log_alpha_padded[:, -1, None, :]),  # Don't normalize last row
                 dim=1)
 
             # Column normalization
             log_alpha_padded = torch.cat((
-                    log_alpha_padded[:, :, :-1] - (torch.logsumexp(log_alpha_padded[:, :, :-1], dim=1, keepdim=True)),
-                    log_alpha_padded[:, :, -1, None]),  # Don't normalize last column
+                log_alpha_padded[:, :, :-1] - (torch.logsumexp(log_alpha_padded[:, :, :-1], dim=1, keepdim=True)),
+                log_alpha_padded[:, :, -1, None]),  # Don't normalize last column
                 dim=2)
 
             if eps > 0:
@@ -200,6 +201,7 @@ def sinkhorn(log_alpha, n_iters: int = 5, slack: bool = True, eps: float = -1) -
                 prev_alpha = torch.exp(log_alpha).clone()
 
     return log_alpha
+
 
 def compute_rigid_transform(a: torch.Tensor, b: torch.Tensor, weights: torch.Tensor):
     """Compute rigid transforms between two point sets
@@ -729,7 +731,7 @@ class DCP(nn.Module):
         if self.use_color:
             src_color = input[2]
             tgt_color = input[3]
-            
+
             embedding_input_src = torch.cat([src, src_color], dim=1)
             embedding_input_tgt = torch.cat([tgt, tgt_color], dim=1)
         else:
