@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 from data import CustomDataset
-from model import DCP
+from model import DCP,knn
 from util import transform_point_cloud, npmat2euler
 import numpy as np
 from torch.utils.data import DataLoader
@@ -162,6 +162,17 @@ def test_one_epoch(args, net, test_loader):
         translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
 
 
+def arap_energy(src, trgt, R,assignment_ab):
+    smm = 0
+    neighs = knn(src, 5)
+    for b in range(src.shape[0]):  # batch_size
+        for i in range(src[b].shape[0]):
+            for j in range(5):
+                n_ind_s = neighs[b, i, j]
+                n_ind_t = assignment_ab[b,n_ind_s]
+                smm += torch.linalg.norm((torch.matmul(R[b].T, trgt[b, :,i] - trgt[b,:, n_ind_t])) - (src[b,:, i] - src[b,:, n_ind_s]))
+
+    return smm
 def train_one_epoch(args, net, train_loader, opt):
     net.train()
 
@@ -200,9 +211,8 @@ def train_one_epoch(args, net, train_loader, opt):
         batch_size = src.size(0)
         opt.zero_grad()
         num_examples += batch_size
-        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
+        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred,assignment_ab = \
             net(src, target, color_src, color_target)
-
         # save rotation and translation
         rotations_ab.append(rotation_ab.detach().cpu().numpy())
         translations_ab.append(translation_ab.detach().cpu().numpy())
@@ -231,6 +241,9 @@ def train_one_epoch(args, net, train_loader, opt):
             cycle_loss = rotation_loss + translation_loss
 
             loss = loss + cycle_loss * 0.1
+        if args.arap and assignment_ab is not None:
+            ar = arap_energy(src,target,rotation_ab,assignment_ab)
+            loss += 0.2*ar # lambda hyperparameter
 
         loss.backward()
         opt.step()
@@ -603,6 +616,8 @@ def main():
                         help='Flag for using the color as input')
     parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
                         help='Flag for using different sampling in source and target')
+    parser.add_argument('--arap', type=bool, default=False, metavar='N',
+                        help='Flag for ARAP regularizer')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
