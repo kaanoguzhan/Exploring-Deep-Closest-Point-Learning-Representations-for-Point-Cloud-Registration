@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import trimesh
+import json
 
 
 # Part of the code is referred from: https://github.com/floodsung/LearningToCompare_FSL
@@ -275,34 +276,43 @@ def test(args, net, test_loader, boardio, textio):
     test_rmse_ab = np.sqrt(test_mse_ab)
     test_rmse_ba = np.sqrt(test_mse_ba)
 
+    scores = {}
     test_rotations_ab_pred_euler = npmat2euler(test_rotations_ab_pred)
-    test_r_mse_ab = np.mean((test_rotations_ab_pred_euler - np.degrees(test_eulers_ab)) ** 2)
-    test_r_rmse_ab = np.sqrt(test_r_mse_ab)
-    test_r_mae_ab = np.mean(np.abs(test_rotations_ab_pred_euler - np.degrees(test_eulers_ab)))
-    test_t_mse_ab = np.mean((test_translations_ab - test_translations_ab_pred) ** 2)
-    test_t_rmse_ab = np.sqrt(test_t_mse_ab)
-    test_t_mae_ab = np.mean(np.abs(test_translations_ab - test_translations_ab_pred))
+    scores['test_r_mse_ab'] = np.mean((test_rotations_ab_pred_euler - np.degrees(test_eulers_ab)) ** 2)
+    scores['test_r_rmse_ab'] = np.sqrt(scores['test_r_mse_ab'])
+    scores['test_r_mae_ab'] = np.mean(np.abs(test_rotations_ab_pred_euler - np.degrees(test_eulers_ab)))
+    scores['test_t_mse_ab'] = np.mean((test_translations_ab - test_translations_ab_pred) ** 2)
+    scores['test_t_rmse_ab'] = np.sqrt(scores['test_t_mse_ab'])
+    scores['test_t_mae_ab'] = np.mean(np.abs(test_translations_ab - test_translations_ab_pred))
 
     test_rotations_ba_pred_euler = npmat2euler(test_rotations_ba_pred, 'xyz')
-    test_r_mse_ba = np.mean((test_rotations_ba_pred_euler - np.degrees(test_eulers_ba)) ** 2)
-    test_r_rmse_ba = np.sqrt(test_r_mse_ba)
-    test_r_mae_ba = np.mean(np.abs(test_rotations_ba_pred_euler - np.degrees(test_eulers_ba)))
-    test_t_mse_ba = np.mean((test_translations_ba - test_translations_ba_pred) ** 2)
-    test_t_rmse_ba = np.sqrt(test_t_mse_ba)
-    test_t_mae_ba = np.mean(np.abs(test_translations_ba - test_translations_ba_pred))
+    scores['test_r_mse_ba'] = np.mean((test_rotations_ba_pred_euler - np.degrees(test_eulers_ba)) ** 2)
+    scores['test_r_rmse_ba'] = np.sqrt(scores['test_r_mse_ba'])
+    scores['test_r_mae_ba'] = np.mean(np.abs(test_rotations_ba_pred_euler - np.degrees(test_eulers_ba)))
+    scores['test_t_mse_ba'] = np.mean((test_translations_ba - test_translations_ba_pred) ** 2)
+    scores['test_t_rmse_ba'] = np.sqrt(scores['test_t_mse_ba'])
+    scores['test_t_mae_ba'] = np.mean(np.abs(test_translations_ba - test_translations_ba_pred))
+
+    result_dir = f'results/{args.exp_name}'
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
+
+    with open(f"{result_dir}/scores.json", 'w') as fout:
+        json_dumps_str = json.dumps(str(scores), indent=4)
+        print(json_dumps_str, file=fout)
 
     textio.cprint('==FINAL TEST==')
     textio.cprint('A--------->B')
     textio.cprint('EPOCH:: %d, Loss: %f, Cycle Loss: %f, MSE: %f, RMSE: %f, MAE: %f, rot_MSE: %f, rot_RMSE: %f, '
                   'rot_MAE: %f, trans_MSE: %f, trans_RMSE: %f, trans_MAE: %f'
                   % (-1, test_loss, test_cycle_loss, test_mse_ab, test_rmse_ab, test_mae_ab,
-                     test_r_mse_ab, test_r_rmse_ab,
-                     test_r_mae_ab, test_t_mse_ab, test_t_rmse_ab, test_t_mae_ab))
+                     scores['test_r_mse_ab'], scores['test_r_rmse_ab'],
+                     scores['test_r_mae_ab'], scores['test_t_mse_ab'], scores['test_t_rmse_ab'], scores['test_t_mae_ab']))
     textio.cprint('B--------->A')
     textio.cprint('EPOCH:: %d, Loss: %f, MSE: %f, RMSE: %f, MAE: %f, rot_MSE: %f, rot_RMSE: %f, '
                   'rot_MAE: %f, trans_MSE: %f, trans_RMSE: %f, trans_MAE: %f'
-                  % (-1, test_loss, test_mse_ba, test_rmse_ba, test_mae_ba, test_r_mse_ba, test_r_rmse_ba,
-                     test_r_mae_ba, test_t_mse_ba, test_t_rmse_ba, test_t_mae_ba))
+                  % (-1, test_loss, test_mse_ba, test_rmse_ba, test_mae_ba, scores['test_r_mse_ba'], scores['test_r_rmse_ba'],
+                     scores['test_r_mae_ba'], scores['test_t_mse_ba'], scores['test_t_rmse_ba'], scores['test_t_mae_ba']))
 
 
 def train(args, net, train_loader, test_loader, boardio, textio):
@@ -562,7 +572,7 @@ def main():
                         help='Dropout ratio in transformer')
     parser.add_argument('--batch-size', type=int, default=32, metavar='batch_size',
                         help='Size of batch)')
-    parser.add_argument('--test-batch_size', type=int, default=10, metavar='batch_size',
+    parser.add_argument('--test-batch-size', type=int, default=10, metavar='batch_size',
                         help='Size of batch)')
     parser.add_argument('--epochs', type=int, default=250, metavar='N',
                         help='number of episode to train ')
