@@ -30,7 +30,7 @@ def download():
 def load_data_modelnet(partition):
     download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(BASE_DIR, 'data')
+    DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'modelnet40'])
     all_data = []
     all_label = []
     for h5_name in glob.glob(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'ply_data_%s*.h5' % partition)):
@@ -46,9 +46,10 @@ def load_data_modelnet(partition):
     return all_data, all_label, None
 
 
-def load_data_mixamo(partition,num_points):
+def load_data_mixamo(partition, num_points):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(BASE_DIR, 'data/objfiles')
+    DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'mixamo', 'objfiles'])
+    print(f'BASE:{DATA_DIR}')
     #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
     #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
     #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
@@ -81,7 +82,7 @@ def load_data(partition, dataset='modelnet40', num_points=1024):
     if dataset == 'modelnet40':
         return load_data_modelnet(partition)
     else:
-        return load_data_mixamo(partition,num_points)
+        return load_data_mixamo(partition, num_points)
 
 
 def translate_pointcloud(pointcloud):
@@ -126,17 +127,23 @@ class CustomDataset(Dataset):
                 if use_color:
                     self.color = self.color[self.label < 20]
 
-    def __getitem__(self, item):
-        pointcloud = self.data[item]
+    def __getitem__(self, index):
+        pointcloud = self.data[index]
         permutation = np.random.permutation(len(pointcloud))
         pointcloud = pointcloud[permutation[:self.num_points]]
         if self.use_color:
-            color = self.color[item][permutation[:self.num_points]]
+            color = self.color[index][permutation[:self.num_points]]
 
         if self.gaussian_noise:
             pointcloud = jitter_pointcloud(pointcloud)
-        if self.partition != 'train':
-            np.random.seed(item)
+        
+        # Fixed random seed for "Validation" and "Test" sets
+        old_random_seed = np.random.get_state()
+        if self.partition != 'valid':
+            np.random.seed(index)
+        if self.partition != 'test':
+            np.random.seed(10000000 + index)
+        
         anglex = np.random.uniform() * np.pi / self.factor
         angley = np.random.uniform() * np.pi / self.factor
         anglez = np.random.uniform() * np.pi / self.factor
@@ -183,7 +190,10 @@ class CustomDataset(Dataset):
         else:
             color1, color2 = np.empty(0), np.empty(0)
         
-        
+        # Restore old random seed
+        if self.partition != 'train':
+            np.random.seed(old_random_seed)
+
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
                euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
@@ -194,7 +204,7 @@ class CustomDataset(Dataset):
 
 
 if __name__ == '__main__':
-    train = CustomDataset(1024)
+    train = CustomDataset(1024, 'train')
     test = CustomDataset(1024, 'test')
     for data in train:
         print(len(data))
