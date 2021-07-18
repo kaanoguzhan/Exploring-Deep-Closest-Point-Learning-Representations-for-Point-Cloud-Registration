@@ -49,15 +49,20 @@ def load_data_modelnet(partition):
 def load_data_mixamo(partition, num_points, different_sampling):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'mixamo', 'objfiles'])
-    print(f'BASE:{DATA_DIR}')
     #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
     #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
     #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
     data , color = [], []
     
     # [(x,3),(x,3)] 
-    
-    npy_files = glob.glob(DATA_DIR + "/*.npy")
+    if partition == "train":
+        npy_files = glob.glob(DATA_DIR + "/*.npy")
+    elif partition == "test":
+        test_size = 5
+        npy_files = glob.glob(DATA_DIR + "/*.npy")
+        npy_files = np.array(npy_files)
+        rng_test = np.arange(len(npy_files))
+        npy_files = npy_files[rng_test[:test_size]]
     
     for file in npy_files:
         tmp = np.load(file)
@@ -186,10 +191,7 @@ class CustomDataset(Dataset):
         euler_ba = -euler_ab[::-1]
 
         permutation1 = np.random.permutation(len(pointcloud1.T))[:self.num_points]
-        if self.different_sampling:
-            permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
-        else:
-            permutation2 = permutation1
+        permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
 
         pointcloud1 = pointcloud1[:, permutation1]
         pointcloud2 = pointcloud2[:, permutation2]

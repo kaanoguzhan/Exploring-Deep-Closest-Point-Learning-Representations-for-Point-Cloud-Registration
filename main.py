@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+ #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 
@@ -18,6 +18,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
+import trimesh
 
 
 # Part of the code is referred from: https://github.com/floodsung/LearningToCompare_FSL
@@ -127,6 +128,19 @@ def test_one_epoch(args, net, test_loader):
 
         mse_ba += torch.mean((transformed_target - src) ** 2, dim=[0, 1, 2]).item() * batch_size
         mae_ba += torch.mean(torch.abs(transformed_target - src), dim=[0, 1, 2]).item() * batch_size
+
+        # m.export("pooints.ply","ply")
+        # m = trimesh.PointCloud(vertices=verts,vertex_colors=colors)
+        #print(src.cpu()[0].shape)
+        #print("Yodelei")
+        #m_src = trimesh.PointCloud(vertices=src.cpu().detach().numpy()[0].T, vertex_colors=color_src.cpu().detach().numpy()[0].T)
+        #m_tgt = trimesh.PointCloud(vertices=target.cpu().detach().numpy()[0].T, vertex_colors=color_target.cpu().detach().numpy()[0].T)
+        #m_src_trans = trimesh.PointCloud(vertices=transformed_src.cpu().detach().numpy()[0].T, vertex_colors=color_src.cpu().detach().numpy()[0].T)
+        #m_tgt_trans = trimesh.PointCloud(vertices=transformed_target.cpu().detach().numpy()[0].T, vertex_colors=color_target.cpu().detach().numpy()[0].T)
+        #m_src.export("src.ply","ply")
+        #m_tgt.export("tgt.ply","ply")
+        #m_src_trans.export("src_trans.ply","ply")
+        #m_tgt_trans.export("tgt_trans.ply","ply")
 
     rotations_ab = np.concatenate(rotations_ab, axis=0)
     translations_ab = np.concatenate(translations_ab, axis=0)
@@ -289,6 +303,7 @@ def test(args, net, test_loader, boardio, textio):
                   'rot_MAE: %f, trans_MSE: %f, trans_RMSE: %f, trans_MAE: %f'
                   % (-1, test_loss, test_mse_ba, test_rmse_ba, test_mae_ba, test_r_mse_ba, test_r_rmse_ba,
                      test_r_mae_ba, test_t_mse_ba, test_t_rmse_ba, test_t_mae_ba))
+
 
 
 def train(args, net, train_loader, test_loader, boardio, textio):
@@ -588,6 +603,8 @@ def main():
                         help='Number of inner iterations used in sinkhorn normalization')
     parser.add_argument('--use-color', type=bool, default=False, metavar='N',
                         help='Flag for using the color as input')
+    parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
+                        help='Flag for using different sampling in source and target')
     parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
                         help='Flag for using different sampling in source and target')
 
