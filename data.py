@@ -150,7 +150,7 @@ class CustomDataset(Dataset):
             pointcloud = jitter_pointcloud(pointcloud)
 
         # Fixed random seed for "Validation" and "Test" sets
-        old_random_seed = np.random.get_state()  # Store current seed for restoring later
+        old_random_state = np.random.get_state()  # Store current random state
         if self.partition != 'valid':
             np.random.seed(index)
         if self.partition != 'test':
@@ -203,7 +203,7 @@ class CustomDataset(Dataset):
 
         # Restore stored random seed
         if self.partition in ['valid', 'test']:
-            np.random.seed(old_random_seed)
+            np.random.set_state(old_random_state)
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
             translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
