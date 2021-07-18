@@ -1,4 +1,4 @@
- #!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 
@@ -88,7 +88,7 @@ def test_one_epoch(args, net, test_loader):
         rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
             net(src, target, color_src, color_target)
 
-        ## save rotation and translation
+        # save rotation and translation
         rotations_ab.append(rotation_ab.detach().cpu().numpy())
         translations_ab.append(translation_ab.detach().cpu().numpy())
         rotations_ab_pred.append(rotation_ab_pred.detach().cpu().numpy())
@@ -108,7 +108,7 @@ def test_one_epoch(args, net, test_loader):
         ###########################
         identity = torch.eye(3).to(args.device).unsqueeze(0).repeat(batch_size, 1, 1)
         loss = F.mse_loss(torch.matmul(rotation_ab_pred.transpose(2, 1), rotation_ab), identity) \
-               + F.mse_loss(translation_ab_pred, translation_ab)
+            + F.mse_loss(translation_ab_pred, translation_ab)
         if args.cycle:
             rotation_loss = F.mse_loss(torch.matmul(rotation_ba_pred, rotation_ab_pred), identity.clone())
             translation_loss = torch.mean((torch.matmul(rotation_ba_pred.transpose(2, 1),
@@ -131,16 +131,16 @@ def test_one_epoch(args, net, test_loader):
 
         # m.export("pooints.ply","ply")
         # m = trimesh.PointCloud(vertices=verts,vertex_colors=colors)
-        #print(src.cpu()[0].shape)
-        #print("Yodelei")
+        # print(src.cpu()[0].shape)
+        # print("Yodelei")
         #m_src = trimesh.PointCloud(vertices=src.cpu().detach().numpy()[0].T, vertex_colors=color_src.cpu().detach().numpy()[0].T)
         #m_tgt = trimesh.PointCloud(vertices=target.cpu().detach().numpy()[0].T, vertex_colors=color_target.cpu().detach().numpy()[0].T)
         #m_src_trans = trimesh.PointCloud(vertices=transformed_src.cpu().detach().numpy()[0].T, vertex_colors=color_src.cpu().detach().numpy()[0].T)
         #m_tgt_trans = trimesh.PointCloud(vertices=transformed_target.cpu().detach().numpy()[0].T, vertex_colors=color_target.cpu().detach().numpy()[0].T)
-        #m_src.export("src.ply","ply")
-        #m_tgt.export("tgt.ply","ply")
-        #m_src_trans.export("src_trans.ply","ply")
-        #m_tgt_trans.export("tgt_trans.ply","ply")
+        # m_src.export("src.ply","ply")
+        # m_tgt.export("tgt.ply","ply")
+        # m_src_trans.export("src_trans.ply","ply")
+        # m_tgt_trans.export("tgt_trans.ply","ply")
 
     rotations_ab = np.concatenate(rotations_ab, axis=0)
     translations_ab = np.concatenate(translations_ab, axis=0)
@@ -156,10 +156,10 @@ def test_one_epoch(args, net, test_loader):
     eulers_ba = np.concatenate(eulers_ba, axis=0)
 
     return total_loss * 1.0 / num_examples, total_cycle_loss / num_examples, \
-           mse_ab * 1.0 / num_examples, mae_ab * 1.0 / num_examples, \
-           mse_ba * 1.0 / num_examples, mae_ba * 1.0 / num_examples, rotations_ab, \
-           translations_ab, rotations_ab_pred, translations_ab_pred, rotations_ba, \
-           translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
+        mse_ab * 1.0 / num_examples, mae_ab * 1.0 / num_examples, \
+        mse_ba * 1.0 / num_examples, mae_ba * 1.0 / num_examples, rotations_ab, \
+        translations_ab, rotations_ab_pred, translations_ab_pred, rotations_ba, \
+        translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
 
 
 def train_one_epoch(args, net, train_loader, opt):
@@ -203,7 +203,7 @@ def train_one_epoch(args, net, train_loader, opt):
         rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
             net(src, target, color_src, color_target)
 
-        ## save rotation and translation
+        # save rotation and translation
         rotations_ab.append(rotation_ab.detach().cpu().numpy())
         translations_ab.append(translation_ab.detach().cpu().numpy())
         rotations_ab_pred.append(rotation_ab_pred.detach().cpu().numpy())
@@ -222,7 +222,7 @@ def train_one_epoch(args, net, train_loader, opt):
         ###########################
         identity = torch.eye(3).to(args.device).unsqueeze(0).repeat(batch_size, 1, 1)
         loss = F.mse_loss(torch.matmul(rotation_ab_pred.transpose(2, 1), rotation_ab), identity) \
-               + F.mse_loss(translation_ab_pred, translation_ab)
+            + F.mse_loss(translation_ab_pred, translation_ab)
         if args.cycle:
             rotation_loss = F.mse_loss(torch.matmul(rotation_ba_pred, rotation_ab_pred), identity.clone())
             translation_loss = torch.mean((torch.matmul(rotation_ba_pred.transpose(2, 1),
@@ -259,19 +259,19 @@ def train_one_epoch(args, net, train_loader, opt):
     eulers_ba = np.concatenate(eulers_ba, axis=0)
 
     return total_loss * 1.0 / num_examples, total_cycle_loss / num_examples, \
-           mse_ab * 1.0 / num_examples, mae_ab * 1.0 / num_examples, \
-           mse_ba * 1.0 / num_examples, mae_ba * 1.0 / num_examples, rotations_ab, \
-           translations_ab, rotations_ab_pred, translations_ab_pred, rotations_ba, \
-           translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
+        mse_ab * 1.0 / num_examples, mae_ab * 1.0 / num_examples, \
+        mse_ba * 1.0 / num_examples, mae_ba * 1.0 / num_examples, rotations_ab, \
+        translations_ab, rotations_ab_pred, translations_ab_pred, rotations_ba, \
+        translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
 
 
 def test(args, net, test_loader, boardio, textio):
 
     test_loss, test_cycle_loss, \
-    test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
-    test_rotations_ab_pred, \
-    test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
-    test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
+        test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
+        test_rotations_ab_pred, \
+        test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
+        test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
     test_rmse_ab = np.sqrt(test_mse_ab)
     test_rmse_ba = np.sqrt(test_mse_ba)
 
@@ -305,7 +305,6 @@ def test(args, net, test_loader, boardio, textio):
                      test_r_mae_ba, test_t_mse_ba, test_t_rmse_ba, test_t_mae_ba))
 
 
-
 def train(args, net, train_loader, test_loader, boardio, textio):
     if args.use_sgd:
         print("Use SGD")
@@ -314,7 +313,6 @@ def train(args, net, train_loader, test_loader, boardio, textio):
         print("Use Adam")
         opt = optim.Adam(net.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = MultiStepLR(opt, milestones=[75, 150, 200], gamma=0.1)
-
 
     best_test_loss = np.inf
     best_test_cycle_loss = np.inf
@@ -342,15 +340,15 @@ def train(args, net, train_loader, test_loader, boardio, textio):
 
     for epoch in range(args.epochs):
         train_loss, train_cycle_loss, \
-        train_mse_ab, train_mae_ab, train_mse_ba, train_mae_ba, train_rotations_ab, train_translations_ab, \
-        train_rotations_ab_pred, \
-        train_translations_ab_pred, train_rotations_ba, train_translations_ba, train_rotations_ba_pred, \
-        train_translations_ba_pred, train_eulers_ab, train_eulers_ba = train_one_epoch(args, net, train_loader, opt)
+            train_mse_ab, train_mae_ab, train_mse_ba, train_mae_ba, train_rotations_ab, train_translations_ab, \
+            train_rotations_ab_pred, \
+            train_translations_ab_pred, train_rotations_ba, train_translations_ba, train_rotations_ba_pred, \
+            train_translations_ba_pred, train_eulers_ab, train_eulers_ba = train_one_epoch(args, net, train_loader, opt)
         test_loss, test_cycle_loss, \
-        test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
-        test_rotations_ab_pred, \
-        test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
-        test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
+            test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
+            test_rotations_ab_pred, \
+            test_translations_ab_pred, test_rotations_ba, test_translations_ba, test_rotations_ba_pred, \
+            test_translations_ba_pred, test_eulers_ab, test_eulers_ba = test_one_epoch(args, net, test_loader)
         train_rmse_ab = np.sqrt(train_mse_ab)
         test_rmse_ab = np.sqrt(test_mse_ab)
 
@@ -482,7 +480,7 @@ def train(args, net, train_loader, test_loader, boardio, textio):
         boardio.add_scalar('B->A/train/translation/RMSE', train_t_rmse_ba, epoch)
         boardio.add_scalar('B->A/train/translation/MAE', train_t_mae_ba, epoch)
 
-        ############TEST
+        # TEST
         boardio.add_scalar('A->B/test/loss', test_loss, epoch)
         boardio.add_scalar('A->B/test/MSE', test_mse_ab, epoch)
         boardio.add_scalar('A->B/test/RMSE', test_rmse_ab, epoch)
@@ -505,7 +503,7 @@ def train(args, net, train_loader, test_loader, boardio, textio):
         boardio.add_scalar('B->A/test/translation/RMSE', test_t_rmse_ba, epoch)
         boardio.add_scalar('B->A/test/translation/MAE', test_t_mae_ba, epoch)
 
-        ############BEST TEST
+        # BEST TEST
         boardio.add_scalar('A->B/best_test/loss', best_test_loss, epoch)
         boardio.add_scalar('A->B/best_test/MSE', best_test_mse_ab, epoch)
         boardio.add_scalar('A->B/best_test/RMSE', best_test_rmse_ab, epoch)
@@ -662,7 +660,6 @@ def main():
         test(args, net, test_loader, boardio, textio)
     else:
         train(args, net, train_loader, test_loader, boardio, textio)
-
 
     print('FINISH')
     boardio.close()

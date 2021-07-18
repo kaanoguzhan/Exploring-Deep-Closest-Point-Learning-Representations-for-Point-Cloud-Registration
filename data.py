@@ -42,7 +42,7 @@ def load_data_modelnet(partition):
         all_label.append(label)
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
-    
+
     return all_data, all_label, None
 
 
@@ -52,9 +52,9 @@ def load_data_mixamo(partition, num_points, different_sampling):
     #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
     #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
     #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
-    data , color = [], []
-    
-    # [(x,3),(x,3)] 
+    data, color = [], []
+
+    # [(x,3),(x,3)]
     if partition == "train":
         npy_files = glob.glob(DATA_DIR + "/*.npy")
     elif partition == "test":
@@ -63,10 +63,10 @@ def load_data_mixamo(partition, num_points, different_sampling):
         npy_files = np.array(npy_files)
         rng_test = np.arange(len(npy_files))
         npy_files = npy_files[rng_test[:test_size]]
-    
+
     for file in npy_files:
         tmp = np.load(file)
-        rng = np.arange(len(tmp[:,0]))
+        rng = np.arange(len(tmp[:, 0]))
         if not different_sampling:
             np.random.shuffle(rng)
             data.append(tmp[rng[:num_points], 0])
@@ -75,15 +75,15 @@ def load_data_mixamo(partition, num_points, different_sampling):
             # Return all points
             data.append(tmp[:, 0])
             color.append(tmp[:, 1])
-        
+
     data = np.array(data)
     color = np.array(color)
 
-    #print(data.shape)
-    #print(color.shape)
+    # print(data.shape)
+    # print(color.shape)
     #data = np.concatenate(data,axis=0)
     #color = np.concatenate(color,axis=0)
-    
+
     return data, None, color
 
 
@@ -112,7 +112,7 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.05):
 class CustomDataset(Dataset):
     def __init__(self, num_points, partition='train', gaussian_noise=False, unseen=False, factor=4,
                  dataset='modelnet40', use_color=False, different_sampling=False):
-        
+
         if dataset == 'modelnet40' and use_color:
             raise Exception('ModelNet40 does not support color. Please set use_color to false.')
         self.different_sampling = different_sampling
@@ -127,7 +127,7 @@ class CustomDataset(Dataset):
         self.factor = factor
         self.use_color = use_color
         if self.unseen:
-            ######## simulate testing on first 20 categories while training on last 20 categories
+            # simulate testing on first 20 categories while training on last 20 categories
             if self.partition == 'test':
                 self.data = self.data[self.label >= 20]
                 self.label = self.label[self.label >= 20]
@@ -148,14 +148,14 @@ class CustomDataset(Dataset):
 
         if self.gaussian_noise:
             pointcloud = jitter_pointcloud(pointcloud)
-        
+
         # Fixed random seed for "Validation" and "Test" sets
-        old_random_seed = np.random.get_state() # Store current seed for restoring later
+        old_random_seed = np.random.get_state()  # Store current seed for restoring later
         if self.partition != 'valid':
             np.random.seed(index)
         if self.partition != 'test':
             np.random.seed(10000000 + index)
-        
+
         anglex = np.random.uniform() * np.pi / self.factor
         angley = np.random.uniform() * np.pi / self.factor
         anglez = np.random.uniform() * np.pi / self.factor
@@ -167,14 +167,14 @@ class CustomDataset(Dataset):
         siny = np.sin(angley)
         sinz = np.sin(anglez)
         Rx = np.array([[1, 0, 0],
-                        [0, cosx, -sinx],
-                        [0, sinx, cosx]])
+                       [0, cosx, -sinx],
+                       [0, sinx, cosx]])
         Ry = np.array([[cosy, 0, siny],
-                        [0, 1, 0],
-                        [-siny, 0, cosy]])
+                       [0, 1, 0],
+                       [-siny, 0, cosy]])
         Rz = np.array([[cosz, -sinz, 0],
-                        [sinz, cosz, 0],
-                        [0, 0, 1]])
+                       [sinz, cosz, 0],
+                       [0, 0, 1]])
         R_ab = Rx.dot(Ry).dot(Rz)
         R_ba = R_ab.T
         translation_ab = np.array([np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5),
@@ -185,7 +185,6 @@ class CustomDataset(Dataset):
 
         rotation_ab = Rotation.from_euler('zyx', [anglez, angley, anglex])
         pointcloud2 = rotation_ab.apply(pointcloud1.T).T + np.expand_dims(translation_ab, axis=1)
-        
 
         euler_ab = np.asarray([anglez, angley, anglex])
         euler_ba = -euler_ab[::-1]
@@ -201,15 +200,15 @@ class CustomDataset(Dataset):
             color2 = color[permutation2].T
         else:
             color1, color2 = np.empty(0), np.empty(0)
-        
+
         # Restore stored random seed
-        if self.partition in ['valid','test']:
+        if self.partition in ['valid', 'test']:
             np.random.seed(old_random_seed)
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
-               translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
-               euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
-               color2.astype('float32')
+            translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
+            euler_ab.astype('float32'), euler_ba.astype('float32'), color1.astype('float32'), \
+            color2.astype('float32')
 
     def __len__(self):
         return self.data.shape[0]

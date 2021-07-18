@@ -2,15 +2,15 @@
 import glob
 import fileinput
 import in_place
-data_path = "/home/yigittunali/Documents/Projects/ml3d/objfiles/"
+import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'mixamo', 'objfiles'])
 
-mtl_files = glob.glob(data_path + "*.mtl")
+mtl_files = glob.glob(DATA_DIR + "*.mtl")
 
-#root_path =
 for filename in mtl_files:
-    f = open(filename,"r")
-    #o =
+    f = open(filename, "r")
     with in_place.InPlace(filename) as file:
         for l in file:
 
@@ -22,7 +22,6 @@ for filename in mtl_files:
 
                 #l = l.replace(l[(st):ed+1],"/" + name + "_textures")
                 l = l.replace(l[(st):ed+1], name + "_textures/")
-                #print(l,end="")
-            print(l,end="")
+                # print(l,end="")
+            print(l, end="")
             file.write(l)
-
