@@ -150,7 +150,7 @@ class CustomDataset(Dataset):
             pointcloud = jitter_pointcloud(pointcloud)
         
         # Fixed random seed for "Validation" and "Test" sets
-        old_random_seed = np.random.get_state()
+        old_random_seed = np.random.get_state() # Store current seed for restoring later
         if self.partition != 'valid':
             np.random.seed(index)
         if self.partition != 'test':
@@ -202,8 +202,8 @@ class CustomDataset(Dataset):
         else:
             color1, color2 = np.empty(0), np.empty(0)
         
-        # Restore old random seed
-        if self.partition != 'train':
+        # Restore stored random seed
+        if self.partition in ['valid','test']:
             np.random.seed(old_random_seed)
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
