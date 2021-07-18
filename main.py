@@ -588,6 +588,8 @@ def main():
                         help='Number of inner iterations used in sinkhorn normalization')
     parser.add_argument('--use-color', type=bool, default=False, metavar='N',
                         help='Flag for using the color as input')
+    parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
+                        help='Flag for using different sampling in source and target')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
@@ -614,11 +616,13 @@ def main():
     if args.dataset in ['modelnet40', 'mixamo']:
         train_loader = DataLoader(
             CustomDataset(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
-                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color),
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color,
+                          different_sampling=args.different_sampling),
             batch_size=args.batch_size, shuffle=True, drop_last=True)
         test_loader = DataLoader(
             CustomDataset(num_points=args.num_points, partition='test', gaussian_noise=args.gaussian_noise,
-                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color),
+                          unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color,
+                          different_sampling=args.different_sampling),
             batch_size=args.test_batch_size, shuffle=False, drop_last=False)
     else:
         raise Exception("not implemented")
