@@ -605,8 +605,6 @@ def main():
                         help='Flag for using the color as input')
     parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
                         help='Flag for using different sampling in source and target')
-    parser.add_argument('--different-sampling', type=bool, default=False, metavar='N',
-                        help='Flag for using different sampling in source and target')
 
     args = parser.parse_args()
     torch.manual_seed(args.seed)
@@ -627,7 +625,6 @@ def main():
     _init_(args)
 
     textio = IOStream('checkpoints/' + args.exp_name + '/run.log')
-    textio.cprint(str(args))
     textio.cprint(str(args))
 
     if args.dataset in ['modelnet40', 'mixamo']:
