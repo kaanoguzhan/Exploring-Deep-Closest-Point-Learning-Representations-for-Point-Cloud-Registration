@@ -615,6 +615,7 @@ class SVDHead(nn.Module):
         self.reflect = nn.Parameter(torch.eye(3), requires_grad=False)
         self.reflect[2, 2] = -1
         self.matching_method = args.matching_method
+        self.arap = args.arap
         assert self.matching_method == 'softmax' or self.matching_method == 'sink_horn'
         if self.matching_method == 'sink_horn':
             self.weights_net = ParameterPredictionNet(weights_dim=[0])
@@ -649,6 +650,8 @@ class SVDHead(nn.Module):
         d_k = src_embedding.size(1)
         scores = torch.matmul(src_embedding.transpose(2, 1).contiguous(), tgt_embedding) / math.sqrt(d_k)
         scores = torch.softmax(scores, dim=2)
+        if self.arap:
+            assignment_a_b = torch.argmax(scores,dim=2)
         src_corr = torch.matmul(tgt, scores.transpose(2, 1).contiguous())
 
         src_centered = src - src.mean(dim=2, keepdim=True)
@@ -681,7 +684,9 @@ class SVDHead(nn.Module):
         R = torch.stack(R, dim=0)
 
         t = torch.matmul(-R, src.mean(dim=2, keepdim=True)) + src_corr.mean(dim=2, keepdim=True)
-        return R, t.view(batch_size, 3)
+        if self.arap:
+            return R, t.view(batch_size, 3),assignment_a_b
+        return R, t.view(batch_size, 3),None
 
     def forward(self, *input):
         src_embedding = input[0]
@@ -703,6 +708,7 @@ class DCP(nn.Module):
         self.emb_dims = args.emb_dims
         self.cycle = args.cycle
         self.use_color = args.use_color
+        self.arap = args.arap
         if args.emb_nn == 'pointnet':
             self.emb_nn = PointNet(emb_dims=self.emb_dims, use_color=args.use_color)
         elif args.emb_nn == 'dgcnn':
@@ -745,12 +751,18 @@ class DCP(nn.Module):
 
         src_embedding = src_embedding + src_embedding_p
         tgt_embedding = tgt_embedding + tgt_embedding_p
-
-        rotation_ab, translation_ab = self.head(src_embedding, tgt_embedding, src, tgt)
+        if self.arap:
+            rotation_ab, translation_ab,assignment_ab = self.head(src_embedding, tgt_embedding, src, tgt)
+        else:
+            rotation_ab, translation_ab, _ = self.head(src_embedding, tgt_embedding, src, tgt)
         if self.cycle:
-            rotation_ba, translation_ba = self.head(tgt_embedding, src_embedding, tgt, src)
+            rotation_ba, translation_ba,_ = self.head(tgt_embedding, src_embedding, tgt, src)
 
         else:
             rotation_ba = rotation_ab.transpose(2, 1).contiguous()
             translation_ba = -torch.matmul(rotation_ba, translation_ab.unsqueeze(2)).squeeze(2)
-        return rotation_ab, translation_ab, rotation_ba, translation_ba
+
+        if self.arap:
+            return rotation_ab, translation_ab, rotation_ba, translation_ba,assignment_ab
+        else:
+            return rotation_ab, translation_ab, rotation_ba, translation_ba,None

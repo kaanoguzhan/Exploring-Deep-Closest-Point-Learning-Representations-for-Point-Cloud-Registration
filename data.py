@@ -28,7 +28,7 @@ def download():
 
 
 def load_data_modelnet(partition):
-    download()
+    # download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'modelnet40'])
     all_data = []
@@ -86,13 +86,63 @@ def load_data_mixamo(partition, num_points, different_sampling):
 
     return data, None, color
 
+def load_data_tumrgbd(partition, num_points, different_sampling):
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'tumrgbd'])
+    #input = np.load(os.path.join(DATA_DIR, 'abla_binary.npy'))
+    #data = np.repeat(input[:, 0][None, :, :], 32, axis=0)
+    #color = np.repeat(input[:, 1][None, :, :], 32, axis=0)
+    data, color = [], []
+
+    # [(x,3),(x,3)]
+    partition= "test"
+    if partition == "train":
+        ply_files = glob.glob(DATA_DIR + "/*.ply")
+    elif partition == "test":
+        test_size = 5
+        ply_files = glob.glob(DATA_DIR + "/*.ply")
+        ply_files = np.array(ply_files)
+        #shuffle here
+        rng_test = np.arange(len(ply_files))
+        ply_files = ply_files[rng_test[:test_size]]
+
+    for file in ply_files:
+
+
+        tmp = trimesh.load_mesh(file)
+        tmp = np.stack([tmp.vertices,tmp.visual.vertex_colors[:,:3]],axis=1)
+
+        rng = np.arange(len(tmp[:, 0]))
+        if not different_sampling:
+            np.random.shuffle(rng)
+            data.append(tmp[rng[:num_points], 0])
+            color.append(tmp[rng[:num_points], 1])
+        else:
+            # Return all points
+            data.append(tmp[:, 0])
+            color.append(tmp[:, 1])
+
+    data = np.array(data)
+    color = np.array(color)
+
+    # print(data.shape)
+    # print(color.shape)
+    #data = np.concatenate(data,axis=0)
+    #color = np.concatenate(color,axis=0)
+
+    return data, None, color
+
 
 def load_data(partition, different_sampling, dataset='modelnet40', num_points=1024):
-    assert dataset in ['modelnet40', 'mixamo']
+    assert dataset in ['modelnet40', 'mixamo','tumrgbd']
     if dataset == 'modelnet40':
         return load_data_modelnet(partition)
-    else:
+    elif dataset == 'mixamo':
         return load_data_mixamo(partition, num_points, different_sampling)
+    elif dataset == 'tumrgbd':
+        return load_data_tumrgbd(partition, num_points, different_sampling)
+
+
 
 
 def translate_pointcloud(pointcloud):
