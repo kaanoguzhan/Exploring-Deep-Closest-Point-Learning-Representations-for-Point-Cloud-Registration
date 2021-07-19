@@ -33,6 +33,7 @@ def load_data_modelnet(partition):
     DATA_DIR = os.path.join(*[BASE_DIR, 'data', 'modelnet40'])
     all_data = []
     all_label = []
+
     for h5_name in glob.glob(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'ply_data_%s*.h5' % partition)):
         f = h5py.File(h5_name)
         data = f['data'][:].astype('float32')
@@ -40,9 +41,9 @@ def load_data_modelnet(partition):
         f.close()
         all_data.append(data)
         all_label.append(label)
+        
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
-
     return all_data, all_label, None
 
 
@@ -240,7 +241,10 @@ class CustomDataset(Dataset):
         euler_ba = -euler_ab[::-1]
 
         permutation1 = np.random.permutation(len(pointcloud1.T))[:self.num_points]
-        permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
+        if self.different_sampling:
+            permutation2 = np.random.permutation(len(pointcloud2.T))[:self.num_points]
+        else:
+            permutation2 = permutation1
 
         pointcloud1 = pointcloud1[:, permutation1]
         pointcloud2 = pointcloud2[:, permutation2]
