@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from scipy.spatial.transform import Rotation
-
+import trimesh
 
 # Part of the code is referred from: https://github.com/ClementPinard/SfmLearner-Pytorch/blob/master/inverse_warp.py
 
@@ -44,3 +44,11 @@ def npmat2euler(mats, seq='zyx'):
         r = Rotation.from_matrix(mats[i])
         eulers.append(r.as_euler(seq, degrees=True))
     return np.asarray(eulers, dtype='float32')
+
+def dump_point_cloud(file_name, point_cloud, colors):
+    if len(colors) == 0:
+        m_src = trimesh.PointCloud(vertices=point_cloud.cpu().detach().numpy().T)
+    else:
+        m_src = trimesh.PointCloud(vertices=point_cloud.cpu().detach().numpy().T, vertex_colors=colors.cpu().detach().numpy().T)
+
+    m_src.export(f"{file_name}.ply","ply")

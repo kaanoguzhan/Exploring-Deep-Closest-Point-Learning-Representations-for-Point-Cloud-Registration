@@ -12,8 +12,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 from data import CustomDataset
-from model import DCP,knn
-from util import transform_point_cloud, npmat2euler
+from model import DCP, knn
+from util import transform_point_cloud, npmat2euler, dump_point_cloud
 import numpy as np
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
@@ -71,9 +71,10 @@ def test_one_epoch(args, net, test_loader):
 
     eulers_ab = []
     eulers_ba = []
+    
+    for idx, (src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba, \
+            color_src, color_target) in enumerate(tqdm(test_loader)):
 
-    for src, target, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba, \
-            color_src, color_target in tqdm(test_loader):
         src = src.to(args.device)
         target = target.to(args.device)
         color_src = color_src.to(args.device)
@@ -105,6 +106,12 @@ def test_one_epoch(args, net, test_loader):
         transformed_src = transform_point_cloud(src, rotation_ab_pred, translation_ab_pred)
 
         transformed_target = transform_point_cloud(target, rotation_ba_pred, translation_ba_pred)
+
+        for i in range(batch_size):
+            dump_point_cloud(f'results/{args.exp_name}/outputs/{idx * batch_size + i}_source', src[i], color_src[i])
+            dump_point_cloud(f'results/{args.exp_name}/outputs/{idx * batch_size + i}_target', target[i], color_target[i])
+            dump_point_cloud(f'results/{args.exp_name}/outputs/{idx * batch_size + i}_transformed_source', transformed_src[i], color_src[i])
+            dump_point_cloud(f'results/{args.exp_name}/outputs/{idx * batch_size + i}_transformed_target', transformed_target[i], color_target[i])
 
         ###########################
         identity = torch.eye(3).to(args.device).unsqueeze(0).repeat(batch_size, 1, 1)
@@ -283,6 +290,11 @@ def train_one_epoch(args, net, train_loader, opt):
 
 def test(args, net, test_loader, boardio, textio):
 
+    result_dir = f'results/{args.exp_name}'
+    output_dir = f'{result_dir}/outputs'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     test_loss, test_cycle_loss, \
         test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
         test_rotations_ab_pred, \
@@ -307,10 +319,6 @@ def test(args, net, test_loader, boardio, textio):
     scores['test_t_mse_ba'] = np.mean((test_translations_ba - test_translations_ba_pred) ** 2)
     scores['test_t_rmse_ba'] = np.sqrt(scores['test_t_mse_ba'])
     scores['test_t_mae_ba'] = np.mean(np.abs(test_translations_ba - test_translations_ba_pred))
-
-    result_dir = f'results/{args.exp_name}'
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
 
     with open(f"{result_dir}/scores.json", 'w') as fout:
         json_dumps_str = json.dumps(str(scores), indent=4)
