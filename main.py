@@ -85,7 +85,7 @@ def test_one_epoch(args, net, test_loader):
 
         batch_size = src.size(0)
         num_examples += batch_size
-        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred = \
+        rotation_ab_pred, translation_ab_pred, rotation_ba_pred, translation_ba_pred,assignment_ab = \
             net(src, target, color_src, color_target)
 
         # save rotation and translation
@@ -170,7 +170,7 @@ def arap_energy(src, trgt, R,assignment_ab):
             for j in range(5):
                 n_ind_s = neighs[b, i, j]
                 n_ind_t = assignment_ab[b,n_ind_s]
-                smm += torch.linalg.norm((torch.matmul(R[b].T, trgt[b, :,i] - trgt[b,:, n_ind_t])) - (src[b,:, i] - src[b,:, n_ind_s]))
+                smm += torch.linalg.norm((torch.matmul(R[b].T, trgt[b, :,assignment_ab[b,i]] - trgt[b,:, n_ind_t])) - (src[b,:, i] - src[b,:, n_ind_s]))
 
     return smm
 def train_one_epoch(args, net, train_loader, opt):
@@ -184,6 +184,7 @@ def train_one_epoch(args, net, train_loader, opt):
     total_loss = 0
     total_cycle_loss = 0
     num_examples = 0
+    tot_ar_loss= 0
     rotations_ab = []
     translations_ab = []
     rotations_ab_pred = []
@@ -244,6 +245,7 @@ def train_one_epoch(args, net, train_loader, opt):
         if args.arap and assignment_ab is not None:
             ar = arap_energy(src,target,rotation_ab,assignment_ab)
             loss += 0.2*ar # lambda hyperparameter
+            tot_ar_loss = tot_ar_loss + ar
 
         loss.backward()
         opt.step()
@@ -257,7 +259,7 @@ def train_one_epoch(args, net, train_loader, opt):
 
         mse_ba += torch.mean((transformed_target - src) ** 2, dim=[0, 1, 2]).item() * batch_size
         mae_ba += torch.mean(torch.abs(transformed_target - src), dim=[0, 1, 2]).item() * batch_size
-
+        avg_ar = tot_ar_loss/num_examples
     rotations_ab = np.concatenate(rotations_ab, axis=0)
     translations_ab = np.concatenate(translations_ab, axis=0)
     rotations_ab_pred = np.concatenate(rotations_ab_pred, axis=0)
@@ -275,7 +277,7 @@ def train_one_epoch(args, net, train_loader, opt):
         mse_ab * 1.0 / num_examples, mae_ab * 1.0 / num_examples, \
         mse_ba * 1.0 / num_examples, mae_ba * 1.0 / num_examples, rotations_ab, \
         translations_ab, rotations_ab_pred, translations_ab_pred, rotations_ba, \
-        translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba
+        translations_ba, rotations_ba_pred, translations_ba_pred, eulers_ab, eulers_ba,avg_ar
 
 
 def test(args, net, test_loader, boardio, textio):
@@ -356,7 +358,7 @@ def train(args, net, train_loader, test_loader, boardio, textio):
             train_mse_ab, train_mae_ab, train_mse_ba, train_mae_ba, train_rotations_ab, train_translations_ab, \
             train_rotations_ab_pred, \
             train_translations_ab_pred, train_rotations_ba, train_translations_ba, train_rotations_ba_pred, \
-            train_translations_ba_pred, train_eulers_ab, train_eulers_ba = train_one_epoch(args, net, train_loader, opt)
+            train_translations_ba_pred, train_eulers_ab, train_eulers_ba,arap_loss = train_one_epoch(args, net, train_loader, opt)
         test_loss, test_cycle_loss, \
             test_mse_ab, test_mae_ab, test_mse_ba, test_mae_ba, test_rotations_ab, test_translations_ab, \
             test_rotations_ab_pred, \
@@ -439,6 +441,10 @@ def train(args, net, train_loader, test_loader, boardio, textio):
                       'rot_MAE: %f, trans_MSE: %f, trans_RMSE: %f, trans_MAE: %f'
                       % (epoch, train_loss, train_cycle_loss, train_mse_ab, train_rmse_ab, train_mae_ab, train_r_mse_ab,
                          train_r_rmse_ab, train_r_mae_ab, train_t_mse_ab, train_t_rmse_ab, train_t_mae_ab))
+
+        boardio.add_scalar('ARAP LOSS', arap_loss, epoch)
+        textio.cprint('AVG ARAP LOSS: %f' % arap_loss)
+
         textio.cprint('B--------->A')
         textio.cprint('EPOCH:: %d, Loss: %f, MSE: %f, RMSE: %f, MAE: %f, rot_MSE: %f, rot_RMSE: %f, '
                       'rot_MAE: %f, trans_MSE: %f, trans_RMSE: %f, trans_MAE: %f'
@@ -599,7 +605,7 @@ def main():
                         help='Wheter to test on unseen category')
     parser.add_argument('--num-points', type=int, default=1024, metavar='N',
                         help='Num of points to use')
-    parser.add_argument('--dataset', type=str, default='modelnet40', choices=['modelnet40', 'mixamo'], metavar='N',
+    parser.add_argument('--dataset', type=str, default='modelnet40', choices=['modelnet40', 'mixamo','tumrgbd'], metavar='N',
                         help='dataset to use')
     parser.add_argument('--factor', type=float, default=4, metavar='N',
                         help='Divided factor for rotations')
@@ -640,7 +646,7 @@ def main():
     textio = IOStream('checkpoints/' + args.exp_name + '/run.log')
     textio.cprint(str(args))
 
-    if args.dataset in ['modelnet40', 'mixamo']:
+    if args.dataset in ['modelnet40', 'mixamo','tumrgbd']:
         train_loader = DataLoader(
             CustomDataset(num_points=args.num_points, partition='train', gaussian_noise=args.gaussian_noise,
                           unseen=args.unseen, factor=args.factor, dataset=args.dataset, use_color=args.use_color,
