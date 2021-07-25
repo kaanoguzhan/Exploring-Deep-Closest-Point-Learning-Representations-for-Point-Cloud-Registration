@@ -1,8 +1,7 @@
-# ML3D Final Project
-
-
+# Exploring Deep Closest Point: Learning Representations for Point Cloud Registration
 
 ## Sample Run
+
 ```bash
 # Example of how to run Training and Testing for color input on our Mixamo dataset
 
@@ -28,3 +27,23 @@ python main.py --eval --device cuda:0 --exp-name=color_input --model=dcp --emb-n
 --matching-method # The point matching method, one of the following ['softmax, 'sink_horn']
 --num_sk_iter # Number of inner iterations used in sinkhorn normalization if sinkhorn is enabled
 ```
+
+## Report
+
+For [full report in PDF format click here][PDF]
+
+### Overview
+
+Note: Images are clickable for higher resolution
+
+Page 1                                                  |  Page 2
+:------------------------------------------------------:|:----------------------------------------------:
+![Page 1  ](github_resources/ML43D_Final_Report-1.png)  |  ![Page 2](github_resources/ML43D_Final_Report-2.png)
+
+Page 3                                               |  Page 4                                               |  Page 5
+:---------------------------------------------------:|:-----------------------------------------------------:|:-----------------------------------------------------------------------------------------------:
+![Page 3](github_resources/ML43D_Final_Report-3.png) | ![Page 4](github_resources/ML43D_Final_Report-4.png)  |  ![Page 5](github_resources/ML43D_Final_Report-5.png)|  ![](github_resources/ML43D_Final_Report-3.png)
+
+[//]: # (These are reference links used in the body of this note and get stripped out when the markdown processor does its job. There is no need to format nicely because it shouldn't be seen. Thanks SO - http://stackoverflow.com/questions/4823468/store-comments-in-markdown-syntax)
+
+   [PDF]: <https://github.com/kaanoguzhan/ml3d/blob/report_and_images/github_resources/ML43D_Final_Report.pdf>
