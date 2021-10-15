@@ -6,11 +6,9 @@
 # Example of how to run Training and Testing for color input on our Mixamo dataset
 
 # Training 
-cd ~/ML3D
 python main.py --device cuda:0 --exp-name=color_input --model=dcp --emb-nn=dgcnn --pointer=transformer --head=svd --test-batch-size 5 --dataset mixamo --use-color True --arap True --model-path checkpoints/model_color_input.249.t7
 
 # Test
-cd ~/ML3D
 python main.py --eval --device cuda:0 --exp-name=color_input --model=dcp --emb-nn=dgcnn --pointer=transformer --head=svd --test-batch-size 5 --dataset mixamo --use-color True --arap True --model-path checkpoints/model_color_diffsample.250.t7
 ```
 
